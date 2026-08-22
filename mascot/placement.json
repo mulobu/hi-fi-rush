@@ -1,0 +1,21 @@
+{
+  "_comment": [
+    "Where the mascot sits, per OBS scene. Camera space: x and y are pixels in",
+    "the 1920x1080 OBS canvas, not page coordinates -- the mascot is a sibling",
+    "of the comic page, never a passenger on it, so a pan never drags it along.",
+    "",
+    "x,y is the PIVOT: the point the gaze rotates about, which sits `pivot` of",
+    "the way down the cell (0.30 = roughly the head). It is not the cell's",
+    "top-left and it is not its centre.",
+    "",
+    "A scene with no entry here hides the mascot. Author these by dragging:",
+    "  http://127.0.0.1:4460/mascot.html?set=deer&edit=1",
+    "in OBS via right-click -> Interact, then paste the JSON it prints."
+  ],
+
+  "scenes": {
+    "GAME": { "x": 211, "y": 832, "size": 360, "pivot": 0.3 },
+    "BRB": { "x": 1562, "y": 465, "size": 390, "pivot": 0.3 },
+    "CHAT": { "x": 1674, "y": 801, "size": 400, "pivot": 0.3 }
+  }
+}

@@ -1,0 +1,703 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>COMIC — OBS wiring test</title>
+    <style>
+      :root {
+        --ink: #16161d;
+        --gutter: #aebcc9;
+        --yellow: #f5d030;
+        --marker: #d93028;
+        --peri: #b9c3d6;
+        --navy: #3b4a9e;
+        --cyan: #35d6e8;
+        --paper: #f4f1e8;
+        --mint: #3fb98a;
+        --plum: #6b3f8f;
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; height: 100%; }
+      body {
+        background: var(--ink);
+        color: var(--paper);
+        font: 13px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
+        padding: 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        overflow: hidden;
+      }
+      h1 {
+        font: 700 15px/1 ui-monospace, monospace;
+        letter-spacing: 0.14em;
+        margin: 0;
+        text-transform: uppercase;
+        color: var(--yellow);
+      }
+      .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+      .grow { flex: 1 1 0; min-width: 0; }
+      .card {
+        background: #1e1e28;
+        border: 2px solid #33333f;
+        border-radius: 6px;
+        padding: 10px 12px;
+      }
+      .card h2 {
+        font: 700 10px/1 ui-monospace, monospace;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--peri);
+        margin: 0 0 8px;
+      }
+      .dot {
+        display: inline-block;
+        width: 9px; height: 9px;
+        border-radius: 50%;
+        background: #555;
+        margin-right: 6px;
+        vertical-align: baseline;
+      }
+      .dot.ok { background: var(--mint); }
+      .dot.bad { background: var(--marker); }
+      .dot.warn { background: var(--yellow); }
+
+      /* --- the headline test --- */
+      .scenes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+      .scenebox .name {
+        font: 700 30px/1.1 ui-monospace, monospace;
+        letter-spacing: 0.04em;
+        color: #6a6a7a;
+        word-break: break-all;
+      }
+      .scenebox.live .name { color: var(--cyan); }
+      .scenebox .meta { color: #7c7c8c; margin-top: 6px; font-size: 11px; }
+      .scenebox.flash { animation: flash 380ms ease-out; }
+      @keyframes flash {
+        0% { border-color: var(--yellow); background: #2c2a1c; }
+        100% { border-color: #33333f; background: #1e1e28; }
+      }
+      .verdict {
+        font: 700 12px/1.3 ui-monospace, monospace;
+        letter-spacing: 0.08em;
+        padding: 8px 12px;
+        border-radius: 5px;
+        background: #2a2a36;
+        color: var(--peri);
+      }
+      .verdict.pass { background: #17392c; color: var(--mint); }
+      .verdict.fail { background: #3a1a18; color: #ff8b84; }
+
+      /* --- preflight --- */
+      .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+      .chip {
+        border: 1.5px solid #44444f;
+        border-radius: 4px;
+        padding: 3px 8px;
+        color: #8a8a99;
+        font-size: 11px;
+      }
+      .chip.ok { border-color: var(--mint); color: var(--mint); }
+      .chip.bad { border-color: var(--marker); color: #ff8b84; }
+
+      table { width: 100%; border-collapse: collapse; font-size: 12px; }
+      th {
+        text-align: left;
+        color: var(--peri);
+        font-weight: 700;
+        font-size: 10px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        padding: 0 8px 6px 0;
+      }
+      td { padding: 3px 8px 3px 0; border-top: 1px solid #2c2c38; }
+      td.num { color: var(--yellow); }
+
+      button {
+        font: 700 11px/1 ui-monospace, monospace;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        background: var(--navy);
+        color: var(--paper);
+        border: 0;
+        border-radius: 4px;
+        padding: 7px 11px;
+        cursor: pointer;
+      }
+      button:hover { background: #4a5cc4; }
+      button.ghost { background: #33333f; }
+      button.hot { background: var(--marker); }
+      button:disabled { opacity: 0.4; cursor: default; }
+      input[type="password"], input[type="text"] {
+        background: #12121a;
+        border: 1.5px solid #44444f;
+        border-radius: 4px;
+        color: var(--paper);
+        padding: 6px 9px;
+        font: 12px ui-monospace, monospace;
+      }
+
+      #log {
+        flex: 1 1 0;
+        overflow-y: auto;
+        background: #12121a;
+        border-radius: 5px;
+        padding: 8px 10px;
+        font-size: 11.5px;
+        line-height: 1.6;
+      }
+      #log div { white-space: pre-wrap; word-break: break-word; }
+      .t { color: #5c5c6c; }
+      .e-ws { color: var(--cyan); }
+      .e-obs { color: var(--yellow); }
+      .e-err { color: #ff8b84; }
+      .e-ok { color: var(--mint); }
+      .e-sys { color: #8a8a99; }
+    </style>
+  </head>
+
+  <body>
+    <div class="row">
+      <h1>COMIC — OBS wiring test</h1>
+      <span class="grow"></span>
+      <span><span class="dot" id="d-ws"></span><span id="s-ws">websocket: idle</span></span>
+      <span><span class="dot" id="d-obs"></span><span id="s-obs">obsstudio: absent</span></span>
+    </div>
+
+    <div class="row">
+      <input type="text" id="host" value="ws://127.0.0.1:4455" size="22" />
+      <input type="password" id="pw" placeholder="websocket password" size="22" />
+      <button id="connect">Connect</button>
+      <button id="refresh" class="ghost" disabled>Re-scan</button>
+      <span class="grow"></span>
+      <button id="copy" class="ghost">Copy log</button>
+      <button id="clear" class="ghost">Clear</button>
+    </div>
+
+    <!-- THE HEADLINE TEST ------------------------------------------------ -->
+    <div class="scenes">
+      <div class="card scenebox" id="box-obs">
+        <h2>window.obsstudio &nbsp;·&nbsp; obsSceneChanged</h2>
+        <div class="name" id="n-obs">—</div>
+        <div class="meta" id="m-obs">no event yet</div>
+      </div>
+      <div class="card scenebox" id="box-ws">
+        <h2>obs-websocket &nbsp;·&nbsp; CurrentProgramSceneChanged</h2>
+        <div class="name" id="n-ws">—</div>
+        <div class="meta" id="m-ws">no event yet</div>
+      </div>
+    </div>
+
+    <div class="verdict" id="verdict">
+      Switch between the trigger scenes. Both boxes must show the TRIGGER scene
+      name (GAME, CAM, …) — not COMIC. If the left box stays dark, the nested
+      browser source never hears scene changes and step 5 must use the websocket.
+    </div>
+
+    <!-- PREFLIGHT --------------------------------------------------------- -->
+    <div class="row" style="align-items: stretch">
+      <div class="card grow">
+        <h2>Scenes expected</h2>
+        <div class="chips" id="c-scenes"><span class="chip">not scanned</span></div>
+      </div>
+      <div class="card grow">
+        <h2>Sources expected inside COMIC</h2>
+        <div class="chips" id="c-sources"><span class="chip">not scanned</span></div>
+      </div>
+    </div>
+
+    <!-- TRANSFORM PING ---------------------------------------------------- -->
+    <div class="card">
+      <div class="row" style="margin-bottom: 8px">
+        <h2 style="margin: 0">COMIC scene items &nbsp;·&nbsp; transform ping</h2>
+        <span class="grow"></span>
+        <button id="restore" class="ghost" disabled>Restore all</button>
+      </div>
+      <table id="items">
+        <thead>
+          <tr>
+            <th>id</th><th>source</th><th>kind</th>
+            <th>x, y</th><th>w × h</th><th>bounds</th><th></th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div id="log"></div>
+
+    <script>
+      /* ==================================================================
+   EXPECTATIONS — these names are the contract. The overlay maps holes
+   to OBS sources by name, so a rename here silently no-ops every
+   SetSceneItemTransform in step 6.
+
+   Scenes are UPPERCASE, sources are TitleCase. Not decoration: OBS keeps
+   scenes and sources in ONE namespace, so a scene named BRB and a source
+   named BRB cannot coexist. The comparison is case-sensitive, so this
+   convention keeps every pair legal.
+   ================================================================== */
+      const HOST_SCENE = "COMIC";
+      const TRIGGER_SCENES = ["START", "GAME", "CAM", "BRB", "CHAT", "END"];
+      const EXPECT_SOURCES = ["Overlay", "Chat", "Cam", "Game", "Brb", "Standby"];
+
+      const $ = (id) => document.getElementById(id);
+      const logEl = $("log");
+
+      function log(cls, msg) {
+        const d = document.createElement("div");
+        const t = new Date().toTimeString().slice(0, 8);
+        d.innerHTML =
+          `<span class="t">${t}.${String(Date.now() % 1000).padStart(3, "0")}</span> ` +
+          `<span class="${cls}">${msg}</span>`;
+        logEl.appendChild(d);
+        logEl.scrollTop = logEl.scrollHeight;
+        while (logEl.childElementCount > 400) logEl.firstChild.remove();
+      }
+
+      /* ==================================================================
+   SHA-256 — hand-rolled on purpose. crypto.subtle is gated behind a
+   secure context, and this page gets loaded from file:// inside CEF.
+   Not worth losing the whole test rig to that technicality.
+   ================================================================== */
+      const K = [
+        0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1,
+        0x923f82a4, 0xab1c5ed5, 0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3,
+        0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174, 0xe49b69c1, 0xefbe4786,
+        0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+        0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147,
+        0x06ca6351, 0x14292967, 0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13,
+        0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85, 0xa2bfe8a1, 0xa81a664b,
+        0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+        0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a,
+        0x5b9cca4f, 0x682e6ff3, 0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208,
+        0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
+      ];
+      const rotr = (x, n) => ((x >>> n) | (x << (32 - n))) >>> 0;
+
+      function sha256(bytes) {
+        const len = bytes.length;
+        const buf = new Uint8Array(((len + 9 + 63) >> 6) << 6);
+        buf.set(bytes);
+        buf[len] = 0x80;
+        const dv = new DataView(buf.buffer);
+        dv.setUint32(buf.length - 4, (len * 8) >>> 0, false);
+        dv.setUint32(buf.length - 8, Math.floor((len * 8) / 4294967296), false);
+
+        let H = [
+          0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
+          0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
+        ];
+        const w = new Uint32Array(64);
+
+        for (let i = 0; i < buf.length; i += 64) {
+          for (let j = 0; j < 16; j++) w[j] = dv.getUint32(i + j * 4, false);
+          for (let j = 16; j < 64; j++) {
+            const a = w[j - 15], b = w[j - 2];
+            const s0 = (rotr(a, 7) ^ rotr(a, 18) ^ (a >>> 3)) >>> 0;
+            const s1 = (rotr(b, 17) ^ rotr(b, 19) ^ (b >>> 10)) >>> 0;
+            w[j] = (w[j - 16] + s0 + w[j - 7] + s1) >>> 0;
+          }
+          let [a, b, c, d, e, f, g, h] = H;
+          for (let j = 0; j < 64; j++) {
+            const S1 = (rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25)) >>> 0;
+            const ch = ((e & f) ^ (~e & g)) >>> 0;
+            const t1 = (h + S1 + ch + K[j] + w[j]) >>> 0;
+            const S0 = (rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22)) >>> 0;
+            const maj = ((a & b) ^ (a & c) ^ (b & c)) >>> 0;
+            const t2 = (S0 + maj) >>> 0;
+            h = g; g = f; f = e; e = (d + t1) >>> 0;
+            d = c; c = b; b = a; a = (t1 + t2) >>> 0;
+          }
+          H = H.map((v, k) => (v + [a, b, c, d, e, f, g, h][k]) >>> 0);
+        }
+        const out = new Uint8Array(32);
+        new DataView(out.buffer).setUint32(0, H[0], false);
+        H.forEach((v, i) => new DataView(out.buffer).setUint32(i * 4, v, false));
+        return out;
+      }
+
+      const utf8 = (s) => new TextEncoder().encode(s);
+      const b64 = (bytes) => btoa(String.fromCharCode(...bytes));
+      const cat = (a, b) => {
+        const r = new Uint8Array(a.length + b.length);
+        r.set(a); r.set(b, a.length);
+        return r;
+      };
+      /* obs-websocket v5 auth: b64(sha256( b64(sha256(pw+salt)) + challenge )) */
+      const authString = (pw, salt, challenge) =>
+        b64(sha256(cat(utf8(b64(sha256(utf8(pw + salt)))), utf8(challenge))));
+
+      /* ==================================================================
+   WEBSOCKET
+   ================================================================== */
+      let ws = null,
+        reqId = 0,
+        pending = new Map(),
+        identified = false;
+
+      function setDot(id, state, text) {
+        $("d-" + id).className = "dot " + state;
+        $("s-" + id).textContent = text;
+      }
+
+      function request(type, data) {
+        return new Promise((resolve, reject) => {
+          if (!identified) return reject(new Error("not identified"));
+          const id = "r" + ++reqId;
+          pending.set(id, { resolve, reject });
+          ws.send(
+            JSON.stringify({
+              op: 6,
+              d: { requestType: type, requestId: id, requestData: data || {} },
+            })
+          );
+        });
+      }
+
+      function connect() {
+        const url = $("host").value.trim();
+        const pw = $("pw").value;
+        try { ws && ws.close(); } catch (_) {}
+        identified = false;
+        setDot("ws", "warn", "websocket: connecting");
+        log("e-sys", `connecting to ${url}`);
+
+        ws = new WebSocket(url);
+
+        ws.onopen = () => log("e-sys", "socket open, waiting for Hello");
+
+        ws.onerror = () => {
+          setDot("ws", "bad", "websocket: error");
+          log("e-err", "socket error — is the server enabled? Tools → WebSocket Server Settings");
+        };
+
+        ws.onclose = (ev) => {
+          identified = false;
+          $("refresh").disabled = true;
+          setDot("ws", "bad", "websocket: closed");
+          log("e-err", `socket closed (${ev.code}) ${ev.reason || ""}`);
+        };
+
+        ws.onmessage = async (ev) => {
+          const msg = JSON.parse(ev.data);
+
+          /* Hello → Identify */
+          if (msg.op === 0) {
+            const d = { rpcVersion: 1, eventSubscriptions: 1 | 4 | 128 };
+            if (msg.d.authentication) {
+              if (!pw) {
+                log("e-err", "server requires auth but no password entered");
+                ws.close();
+                return;
+              }
+              d.authentication = authString(
+                pw, msg.d.authentication.salt, msg.d.authentication.challenge
+              );
+            }
+            log("e-sys", `hello — obs-websocket ${msg.d.obsWebSocketVersion}, auth ${msg.d.authentication ? "required" : "off"}`);
+            ws.send(JSON.stringify({ op: 1, d }));
+            return;
+          }
+
+          /* Identified */
+          if (msg.op === 2) {
+            identified = true;
+            $("refresh").disabled = false;
+            setDot("ws", "ok", "websocket: identified");
+            log("e-ok", "identified");
+            try { localStorage.setItem("comic.pw", pw); } catch (_) {}
+            scan();
+            return;
+          }
+
+          /* Event */
+          if (msg.op === 5) {
+            handleEvent(msg.d.eventType, msg.d.eventData);
+            return;
+          }
+
+          /* RequestResponse */
+          if (msg.op === 7) {
+            const p = pending.get(msg.d.requestId);
+            if (!p) return;
+            pending.delete(msg.d.requestId);
+            if (msg.d.requestStatus.result) p.resolve(msg.d.responseData || {});
+            else {
+              log("e-err", `${msg.d.requestType} failed: ${msg.d.requestStatus.code} ${msg.d.requestStatus.comment || ""}`);
+              p.reject(new Error(msg.d.requestStatus.comment || "request failed"));
+            }
+          }
+        };
+      }
+
+      /* ==================================================================
+   SCENE CHANGE — the two paths, timed against each other
+   ================================================================== */
+      const lastSeen = { obs: null, ws: null };
+
+      function noteScene(which, name) {
+        const now = performance.now();
+        const other = which === "obs" ? "ws" : "obs";
+        lastSeen[which] = { name, t: now };
+
+        const box = $("box-" + which);
+        box.classList.add("live", "flash");
+        setTimeout(() => box.classList.remove("flash"), 400);
+        $("n-" + which).textContent = name;
+
+        let meta = new Date().toTimeString().slice(0, 8);
+        const o = lastSeen[other];
+        if (o && o.name === name) {
+          const delta = now - o.t;
+          meta += delta >= 0
+            ? ` · ${delta.toFixed(1)}ms after ${other}`
+            : ` · ${(-delta).toFixed(1)}ms before ${other}`;
+        }
+        $("m-" + which).textContent = meta;
+
+        log(which === "obs" ? "e-obs" : "e-ws", `scene → ${name}  [${which}]`);
+        judge(name);
+      }
+
+      function judge(name) {
+        const v = $("verdict");
+        const heardObs = lastSeen.obs && lastSeen.obs.name === name;
+        const heardWs = lastSeen.ws && lastSeen.ws.name === name;
+
+        if (name === HOST_SCENE) {
+          v.className = "verdict";
+          v.textContent =
+            `Program is ${HOST_SCENE} itself. Switch to a TRIGGER scene ` +
+            `(${TRIGGER_SCENES.join(", ")}) — those are what the Stream Deck presses.`;
+          return;
+        }
+        if (!TRIGGER_SCENES.includes(name)) {
+          v.className = "verdict";
+          v.textContent = `"${name}" is not a known trigger scene. Expected one of: ${TRIGGER_SCENES.join(", ")}.`;
+          return;
+        }
+        if (heardObs && heardWs) {
+          v.className = "verdict pass";
+          v.textContent =
+            `PASS — the nested browser source hears "${name}" on BOTH paths. ` +
+            `Step 5 can drive pans from window.obsstudio and keep the websocket for transforms only.`;
+        } else if (heardWs) {
+          v.className = "verdict fail";
+          v.textContent =
+            `PARTIAL — websocket saw "${name}", window.obsstudio did NOT. ` +
+            `obsSceneChanged does not cross the nested-scene boundary here; step 5 must use the websocket as the only scene-change path, and a dropped socket now freezes pans.`;
+        } else if (heardObs) {
+          v.className = "verdict";
+          v.textContent = `obsstudio saw "${name}"; websocket has not reported it. Connect the socket to compare.`;
+        }
+      }
+
+      function handleEvent(type, data) {
+        if (type === "CurrentProgramSceneChanged") {
+          noteScene("ws", data.sceneName);
+          scanItems();
+        } else if (type === "SceneItemTransformChanged") {
+          /* noisy — only log while pinging */
+        } else {
+          log("e-sys", `event: ${type}`);
+        }
+      }
+
+      /* window.obsstudio — injected by OBS into every browser source */
+      if (window.obsstudio) {
+        setDot("obs", "ok", `obsstudio: ${window.obsstudio.pluginVersion || "present"}`);
+        log("e-ok", `window.obsstudio present (${window.obsstudio.pluginVersion || "?"})`);
+        try {
+          window.obsstudio.getCurrentScene((s) => {
+            log("e-obs", `getCurrentScene → ${s && s.name} (${s && s.width}×${s && s.height})`);
+            if (s && s.name) noteScene("obs", s.name);
+          });
+        } catch (e) {
+          log("e-err", "getCurrentScene threw: " + e.message);
+        }
+      } else {
+        setDot("obs", "bad", "obsstudio: absent (not in OBS)");
+        log("e-sys", "window.obsstudio absent — you are in a normal browser, so only the websocket path can be tested");
+      }
+
+      window.addEventListener("obsSceneChanged", (e) =>
+        noteScene("obs", e.detail && e.detail.name)
+      );
+      window.addEventListener("obsSourceVisibleChanged", (e) =>
+        log("e-obs", `sourceVisibleChanged visible=${e.detail && e.detail.visible}`)
+      );
+      window.addEventListener("obsSourceActiveChanged", (e) =>
+        log("e-obs", `sourceActiveChanged active=${e.detail && e.detail.active}`)
+      );
+
+      /* ==================================================================
+   PREFLIGHT + SCENE ITEMS
+   ================================================================== */
+      const originals = new Map(); // sceneItemId -> transform as first seen
+
+      function chips(el, expected, found) {
+        el.innerHTML = "";
+        expected.forEach((name) => {
+          const s = document.createElement("span");
+          s.className = "chip " + (found.includes(name) ? "ok" : "bad");
+          s.textContent = name;
+          el.appendChild(s);
+        });
+        found
+          .filter((n) => !expected.includes(n))
+          .forEach((name) => {
+            const s = document.createElement("span");
+            s.className = "chip";
+            s.textContent = name + " (extra)";
+            el.appendChild(s);
+          });
+      }
+
+      async function scan() {
+        try {
+          const v = await request("GetVersion");
+          log("e-ok", `OBS ${v.obsVersion} · websocket ${v.obsWebSocketVersion} · platform ${v.platformDescription}`);
+
+          const sl = await request("GetSceneList");
+          const names = sl.scenes.map((s) => s.sceneName);
+          chips($("c-scenes"), [HOST_SCENE, ...TRIGGER_SCENES], names);
+
+          const missing = [HOST_SCENE, ...TRIGGER_SCENES].filter((n) => !names.includes(n));
+          if (missing.length) log("e-err", `missing scenes: ${missing.join(", ")}`);
+          else log("e-ok", "all expected scenes exist");
+
+          noteScene("ws", sl.currentProgramSceneName);
+          await scanItems();
+        } catch (e) {
+          log("e-err", "scan failed: " + e.message);
+        }
+      }
+
+      async function scanItems() {
+        let r;
+        try {
+          r = await request("GetSceneItemList", { sceneName: HOST_SCENE });
+        } catch (e) {
+          chips($("c-sources"), EXPECT_SOURCES, []);
+          log("e-err", `cannot read "${HOST_SCENE}" — does that scene exist, spelled exactly?`);
+          return;
+        }
+        const items = r.sceneItems;
+        chips($("c-sources"), EXPECT_SOURCES, items.map((i) => i.sourceName));
+
+        const tb = $("items").querySelector("tbody");
+        tb.innerHTML = "";
+        items
+          .slice()
+          .reverse() /* OBS returns bottom-up; show top-down like the UI */
+          .forEach((it) => {
+            const t = it.sceneItemTransform;
+            if (!originals.has(it.sceneItemId))
+              originals.set(it.sceneItemId, JSON.parse(JSON.stringify(t)));
+
+            const tr = document.createElement("tr");
+            tr.innerHTML =
+              `<td class="num">${it.sceneItemId}</td>` +
+              `<td>${it.sourceName}</td>` +
+              `<td>${it.inputKind || (it.isGroup ? "group" : "scene")}</td>` +
+              `<td>${Math.round(t.positionX)}, ${Math.round(t.positionY)}</td>` +
+              `<td>${Math.round(t.width)} × ${Math.round(t.height)}</td>` +
+              `<td>${(t.boundsType || "").replace("OBS_BOUNDS_", "")}</td>`;
+
+            const td = document.createElement("td");
+            const b = document.createElement("button");
+            b.textContent = "ping";
+            b.onclick = () => ping(it.sceneItemId, it.sourceName);
+            td.appendChild(b);
+            tr.appendChild(td);
+            tb.appendChild(tr);
+          });
+
+        $("restore").disabled = originals.size === 0;
+      }
+
+      /* Slam a source to a known rect. This is exactly what step 6 does every
+         frame, so if it works while a TRIGGER scene is live, the nested-scene
+         targeting is proven: we address COMIC, not the scene that's on program. */
+      async function ping(id, name) {
+        const rect = {
+          positionX: 320, positionY: 180,
+          alignment: 5, /* top-left, so position == the rect's corner */
+          boundsType: "OBS_BOUNDS_STRETCH",
+          boundsAlignment: 0,
+          boundsWidth: 1280, boundsHeight: 720,
+          rotation: 0,
+        };
+        try {
+          await request("SetSceneItemTransform", {
+            sceneName: HOST_SCENE,
+            sceneItemId: id,
+            sceneItemTransform: rect,
+          });
+          log("e-ok", `ping → ${name} (item ${id}) moved to 320,180 1280×720 in ${HOST_SCENE}`);
+          scanItems();
+        } catch (e) {
+          log("e-err", `ping ${name} failed: ${e.message}`);
+        }
+      }
+
+      async function restoreAll() {
+        for (const [id, t] of originals) {
+          const payload = {
+            positionX: t.positionX, positionY: t.positionY,
+            rotation: t.rotation, alignment: t.alignment,
+            cropLeft: t.cropLeft, cropRight: t.cropRight,
+            cropTop: t.cropTop, cropBottom: t.cropBottom,
+            boundsType: t.boundsType,
+          };
+          /* OBS rejects zero bounds; only send them when bounds are actually on */
+          if (t.boundsType && t.boundsType !== "OBS_BOUNDS_NONE") {
+            payload.boundsAlignment = t.boundsAlignment;
+            payload.boundsWidth = t.boundsWidth;
+            payload.boundsHeight = t.boundsHeight;
+          } else {
+            payload.scaleX = t.scaleX;
+            payload.scaleY = t.scaleY;
+          }
+          try {
+            await request("SetSceneItemTransform", {
+              sceneName: HOST_SCENE, sceneItemId: id, sceneItemTransform: payload,
+            });
+          } catch (e) {
+            log("e-err", `restore item ${id} failed: ${e.message}`);
+          }
+        }
+        log("e-ok", "restored all items to their transforms at first scan");
+        scanItems();
+      }
+
+      /* ==================================================================
+   WIRING
+   ================================================================== */
+      $("connect").onclick = connect;
+      $("refresh").onclick = scan;
+      $("restore").onclick = restoreAll;
+      $("clear").onclick = () => (logEl.innerHTML = "");
+      $("copy").onclick = () => {
+        const txt = [...logEl.children].map((d) => d.textContent).join("\n");
+        navigator.clipboard.writeText(txt).then(
+          () => log("e-sys", "log copied"),
+          () => log("e-err", "clipboard blocked — select and copy manually")
+        );
+      };
+
+      /* Password: ?pw= wins, then whatever worked last time. A browser source
+         has no keyboard, so the URL is the only way to hand it a password. */
+      const qs = new URLSearchParams(location.search);
+      const qpw = qs.get("pw");
+      const qhost = qs.get("host");
+      if (qhost) $("host").value = qhost;
+      if (qpw) $("pw").value = qpw;
+      else { try { $("pw").value = localStorage.getItem("comic.pw") || ""; } catch (_) {} }
+      if ($("pw").value || qs.has("auto")) setTimeout(connect, 300);
+
+      log("e-sys", `page loaded ${window.obsstudio ? "inside OBS" : "in a plain browser"}`);
+    </script>
+  </body>
+</html>

@@ -1,0 +1,47 @@
+# macOS / Python noise
+.DS_Store
+__pycache__/
+*.pyc
+
+# ---------------------------------------------------------------------------
+# assets/ is the workshop; mascot/deer/ is the shipped goods.
+#
+# Everything under assets/ is input and scratch for tools/hero-asset.py: the
+# source video, the plate, the 80-odd scrub stills you flick through to find
+# the loop points, the per-frame cells, the contact sheets, and a copy of the
+# finished sheet. About 390 MB of it, none of it needed to run the overlay, and
+# all of it reproducible from the source video plus the command in the README.
+#
+# What ships is mascot/deer/{sheet.webp,manifest.json} -- the pair mascot.html
+# actually loads. Building a new sprite set means copying those two out of
+# assets/deer/ into mascot/deer/.
+#
+# The three originals below ARE committed. They are the inputs no command can
+# regenerate: a prompt does not reproduce an image generator's output, and the
+# video is a one-off render. ~18 MB to never have to recreate the character.
+# Everything derived from them stays out.
+#
+# `assets/*` rather than `assets/`, because git cannot re-include a file whose
+# parent directory is excluded -- with `assets/` excluded the three ! lines
+# below would silently do nothing.
+assets/*
+!assets/deer-raw.png
+!assets/deer-plate.png
+!assets/deer.mp4
+
+# The uncompressed sheet is a fallback nothing loads: mascot.html reads `sheet`
+# out of manifest.json, which names the webp. 9 MB for a spare.
+mascot/deer/sheet.png
+
+# Local-only Claude Code settings
+.claude/settings.local.json
+
+# Working copies. Rename to something meaningful if you want one committed.
+*copy.html
+
+# obs/comic-scenes.json IS committed on purpose -- it is the sanitised export
+# from `obs-setup.py --export`. Never commit a collection straight out of
+# ~/Library/Application Support/obs-studio: OBS stores browser URLs verbatim,
+# so the raw file carries the websocket password and your home path.
+basic/scenes/
+*.json.bak

@@ -1,0 +1,1307 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Comic Page Overlay — v3</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Bangers&family=Permanent+Marker&family=Caveat:wght@600;700&family=Baloo+2:wght@600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ============================================================
+   TOKENS
+   ============================================================ */
+      :root {
+        --ink: #16161d;
+        --gutter: #aebcc9;
+        --yellow: #f5d030;
+        --marker: #d93028;
+        --peri: #b9c3d6;
+        --navy: #3b4a9e;
+        --cyan: #35d6e8;
+        --paper: #f4f1e8;
+        --mint: #3fb98a;
+        --plum: #6b3f8f;
+
+        --canvas-w: 1920px;
+        --canvas-h: 1080px;
+        --page-w: 7680px;
+        --page-h: 4320px;
+
+        --beat-ms: 500ms;
+        --pan-ms: 980ms;
+        --snap: cubic-bezier(0.32, 1.38, 0.48, 1);
+
+        --f-display: "Bangers", "Arial Black", sans-serif;
+        --f-marker: "Permanent Marker", cursive;
+        --f-scrawl: "Caveat", cursive;
+        --f-body: "Baloo 2", system-ui, sans-serif;
+
+        --wobble: 240px 18px 200px 22px / 20px 210px 24px 230px;
+        --wobble-sm: 80px 8px 70px 10px / 9px 74px 11px 78px;
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        background: #05050a;
+        font-family: var(--f-body);
+        color: var(--paper);
+        overflow: hidden;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+
+      /* ============================================================
+   NAVBAR — mockup chrome only
+   ============================================================ */
+      .navbar {
+        flex: 0 0 auto;
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        padding: 11px 16px;
+        background: var(--ink);
+        border-bottom: 4px solid var(--gutter);
+        flex-wrap: wrap;
+        z-index: 100;
+      }
+      .nav-title {
+        font-family: var(--f-marker);
+        font-size: 15px;
+        color: var(--yellow);
+        margin-right: 6px;
+        white-space: nowrap;
+        transform: rotate(-1.5deg);
+      }
+      .btn {
+        font-family: var(--f-display);
+        font-size: 19px;
+        letter-spacing: 0.06em;
+        color: var(--ink);
+        background: var(--paper);
+        border: 3px solid var(--ink);
+        box-shadow: 4px 4px 0 var(--ink);
+        padding: 5px 13px;
+        cursor: pointer;
+        line-height: 1.1;
+        transition:
+          transform 0.08s var(--snap),
+          box-shadow 0.08s,
+          background 0.08s;
+      }
+      .btn:hover {
+        background: var(--yellow);
+      }
+      .btn:active {
+        transform: translate(4px, 4px);
+        box-shadow: 0 0 0 var(--ink);
+      }
+      .btn:focus-visible {
+        outline: 3px solid var(--cyan);
+        outline-offset: 3px;
+      }
+      .btn.active {
+        background: var(--marker);
+        color: var(--paper);
+        box-shadow: 4px 4px 0 var(--cyan);
+      }
+      .btn.page-btn {
+        background: var(--cyan);
+      }
+      .btn.page-btn.active {
+        background: var(--navy);
+        color: var(--paper);
+      }
+      .btn.art {
+        opacity: 0.62;
+        font-size: 16px;
+      }
+      .toggle {
+        font-family: var(--f-body);
+        font-weight: 800;
+        font-size: 11px;
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
+        color: var(--paper);
+        background: transparent;
+        border: 2px solid var(--gutter);
+        padding: 6px 10px;
+        cursor: pointer;
+      }
+      .toggle[aria-pressed="true"] {
+        background: var(--paper);
+        color: var(--ink);
+      }
+      .toggle:focus-visible {
+        outline: 3px solid var(--cyan);
+        outline-offset: 2px;
+      }
+      .spacer {
+        flex: 1;
+      }
+      .beat-dot {
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: var(--marker);
+        animation: beat var(--beat-ms) steps(1, end) infinite;
+      }
+      @keyframes beat {
+        0% {
+          transform: scale(1.55);
+          opacity: 1;
+        }
+        40%,
+        100% {
+          transform: scale(0.8);
+          opacity: 0.3;
+        }
+      }
+      .bpm-label {
+        font-family: var(--f-display);
+        font-size: 16px;
+        letter-spacing: 0.08em;
+      }
+
+      /* ============================================================
+   STAGE
+   ============================================================ */
+      .stage {
+        flex: 1 1 auto;
+        position: relative;
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+      }
+      .viewport {
+        position: relative;
+        width: var(--canvas-w);
+        height: var(--canvas-h);
+        overflow: hidden;
+        background: var(--gutter);
+        transform-origin: center center;
+        outline: 2px solid rgba(255, 255, 255, 0.12);
+      }
+      .shaker {
+        position: absolute;
+        inset: 0;
+      }
+      .shaker.shake {
+        animation: shake 180ms steps(3, end);
+      }
+      @keyframes shake {
+        0% {
+          transform: translate(0, 0);
+        }
+        30% {
+          transform: translate(-9px, 6px);
+        }
+        60% {
+          transform: translate(7px, -7px);
+        }
+        100% {
+          transform: translate(0, 0);
+        }
+      }
+
+      .page {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: var(--page-w);
+        height: var(--page-h);
+        transform-origin: 0 0;
+        transition: transform var(--pan-ms) var(--snap);
+        will-change: transform;
+        background: var(--gutter);
+      }
+      .page::before {
+        content: "";
+        position: absolute;
+        inset: -3990px; /* 133 whole tiles — see note below */
+        pointer-events: none;
+        background-image: radial-gradient(var(--ink) 32%, transparent 33%);
+        background-size: 30px 30px;
+        opacity: 0.1;
+      }
+
+      /* ============================================================
+   PANELS
+   ============================================================ */
+      .panel {
+        position: absolute;
+        overflow: hidden;
+        cursor: pointer;
+        border: 15px solid var(--ink);
+        border-radius: var(--wobble);
+        box-shadow: 22px 22px 0 rgba(22, 22, 29, 0.55);
+      }
+      .panel::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background-image: radial-gradient(
+          rgba(22, 22, 29, 0.85) 30%,
+          transparent 31%
+        );
+        background-size: 26px 26px;
+        opacity: 0.18;
+        mix-blend-mode: multiply;
+      }
+
+      /* HOLES — transparent windows. One OBS source sits behind each. */
+      .hole {
+        position: absolute;
+        background: transparent;
+        overflow: hidden;
+        border: 11px solid var(--ink);
+        border-radius: var(--wobble-sm);
+        box-shadow: 12px 12px 0 rgba(22, 22, 29, 0.6);
+      }
+      .hole.bare {
+        border: 0;
+        border-radius: 0;
+        box-shadow: none;
+      }
+      .fake-source {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        background:
+          repeating-linear-gradient(
+            45deg,
+            rgba(0, 0, 0, 0.26) 0 40px,
+            rgba(0, 0, 0, 0.08) 40px 80px
+          ),
+          var(--src, #2b2b3d);
+      }
+      .src-label {
+        font-family: var(--f-body);
+        font-weight: 800;
+        font-size: 44px;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: rgba(255, 255, 255, 0.5);
+        text-align: center;
+        padding: 0 24px;
+      }
+
+      /* tags */
+      .panel-tag {
+        position: absolute;
+        bottom: 32px;
+        left: 32px;
+        background: var(--ink);
+        color: var(--paper);
+        font-family: var(--f-display);
+        font-size: 50px;
+        letter-spacing: 0.06em;
+        padding: 8px 24px 4px;
+        transform: rotate(-1.2deg);
+        box-shadow: 11px 11px 0 var(--marker);
+        pointer-events: none;
+        z-index: 8;
+        animation: tagPulse var(--beat-ms) var(--snap) infinite;
+      }
+      @keyframes tagPulse {
+        0% {
+          transform: rotate(-1.2deg) scale(1.045);
+        }
+        45%,
+        100% {
+          transform: rotate(-1.2deg) scale(1);
+        }
+      }
+      .panel.is-live .panel-tag {
+        box-shadow: 11px 11px 0 var(--cyan);
+      }
+
+      /* shared decorations */
+      .speedlines {
+        position: absolute;
+        inset: -30%;
+        pointer-events: none;
+        background: repeating-conic-gradient(
+          from 0deg at 50% 50%,
+          rgba(22, 22, 29, 0.3) 0deg 1deg,
+          transparent 1deg 3.4deg
+        );
+        animation: spin 42s linear infinite;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      .rays {
+        position: absolute;
+        inset: -40%;
+        pointer-events: none;
+        background: repeating-conic-gradient(
+          from 0deg at 50% 50%,
+          rgba(255, 255, 255, 0.3) 0deg 4deg,
+          transparent 4deg 11deg
+        );
+        animation: spin 26s linear infinite reverse;
+      }
+
+      .bubble {
+        position: absolute;
+        background: var(--paper);
+        border: 10px solid var(--ink);
+        border-radius: var(--wobble-sm);
+        padding: 18px 30px;
+        font-family: var(--f-body);
+        font-weight: 700;
+        color: var(--ink);
+        z-index: 7;
+      }
+      .bubble::after {
+        content: "";
+        position: absolute;
+        bottom: -52px;
+        left: 44px;
+        border: 26px solid transparent;
+        border-top-color: var(--ink);
+      }
+
+      .stamp {
+        position: absolute;
+        display: grid;
+        place-items: center;
+        font-family: var(--f-display);
+        color: var(--yellow);
+        -webkit-text-stroke: 12px var(--ink);
+        paint-order: stroke fill;
+        z-index: 7;
+        animation: stampPulse calc(var(--beat-ms) * 2) var(--snap) infinite;
+      }
+      @keyframes stampPulse {
+        0% {
+          transform: rotate(-9deg) scale(1.14);
+        }
+        30%,
+        100% {
+          transform: rotate(-9deg) scale(0.96);
+        }
+      }
+
+      .scrawl {
+        position: absolute;
+        font-family: var(--f-scrawl);
+        font-weight: 700;
+        color: var(--marker);
+        z-index: 7;
+        pointer-events: none;
+      }
+
+      /* ============================================================
+   PANEL 1 — STREAM START
+   ============================================================ */
+      .p-start {
+        background: var(--plum);
+      }
+      .p-start .big {
+        position: absolute;
+        left: 5%;
+        top: 14%;
+        font-family: var(--f-display);
+        font-size: 300px;
+        line-height: 0.82;
+        color: var(--yellow);
+        -webkit-text-stroke: 14px var(--ink);
+        paint-order: stroke fill;
+        transform: rotate(-2deg);
+      }
+      .p-start .clock {
+        position: absolute;
+        left: 6%;
+        top: 62%;
+        font-family: var(--f-display);
+        font-size: 190px;
+        color: var(--paper);
+        -webkit-text-stroke: 10px var(--ink);
+        paint-order: stroke fill;
+        letter-spacing: 0.06em;
+      }
+      .p-start .scrawl {
+        left: 5%;
+        top: 6%;
+        font-size: 110px;
+        transform: rotate(-4deg);
+      }
+
+      /* ============================================================
+   PANEL 3 — GAMEPLAY
+   ============================================================ */
+      .p-game {
+        background: var(--ink);
+      }
+
+      /* ============================================================
+   PANEL 4 — FULL CAM
+   ============================================================ */
+      .p-cam {
+        background: var(--mint);
+      }
+
+      /* ============================================================
+   PANEL 5 — BRB
+   ============================================================ */
+      .p-brb {
+        background: var(--marker);
+      }
+      .p-brb .big {
+        position: absolute;
+        left: 4%;
+        top: 16%;
+        font-family: var(--f-display);
+        font-size: 260px;
+        line-height: 0.8;
+        color: var(--yellow);
+        -webkit-text-stroke: 14px var(--ink);
+        paint-order: stroke fill;
+        transform: rotate(-2.4deg);
+      }
+      /* cat silhouette */
+      .cat {
+        position: absolute;
+        right: 30%;
+        bottom: 6%;
+        width: 300px;
+        height: 250px;
+        z-index: 6;
+        animation: bob var(--beat-ms) var(--snap) infinite;
+      }
+      @keyframes bob {
+        0% {
+          transform: translateY(-22px);
+        }
+        50%,
+        100% {
+          transform: translateY(0);
+        }
+      }
+      .cat .body {
+        position: absolute;
+        inset: auto 0 0 0;
+        height: 66%;
+        background: var(--ink);
+        border-radius: 52% 52% 40% 40%;
+      }
+      .cat .ear {
+        position: absolute;
+        top: 6%;
+        width: 0;
+        height: 0;
+        border-left: 44px solid transparent;
+        border-right: 44px solid transparent;
+        border-bottom: 76px solid var(--ink);
+      }
+      .cat .ear.l {
+        left: 12%;
+        transform: rotate(-14deg);
+      }
+      .cat .ear.r {
+        right: 12%;
+        transform: rotate(14deg);
+      }
+      .cat .eye {
+        position: absolute;
+        top: 46%;
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        background: var(--cyan);
+      }
+      .cat .eye.l {
+        left: 32%;
+      }
+      .cat .eye.r {
+        right: 32%;
+      }
+
+      /* ============================================================
+   PANEL 6 — STREAM END
+   ============================================================ */
+      .p-end {
+        background: var(--navy);
+      }
+      .p-end .big {
+        position: absolute;
+        left: 4%;
+        top: 12%;
+        font-family: var(--f-display);
+        font-size: 190px;
+        line-height: 0.82;
+        color: var(--paper);
+        -webkit-text-stroke: 12px var(--ink);
+        paint-order: stroke fill;
+        transform: rotate(-1.4deg);
+      }
+      .p-end .rank {
+        right: 26%;
+        top: 12%;
+        width: 340px;
+        height: 340px;
+        font-size: 280px;
+        line-height: 1;
+      }
+      .credits {
+        position: absolute;
+        left: 4%;
+        bottom: 8%;
+        width: 44%;
+        height: 34%;
+        overflow: hidden;
+        z-index: 6;
+      }
+      .credits ul {
+        position: absolute;
+        list-style: none;
+        animation: roll 14s linear infinite;
+      }
+      .credits li {
+        font-family: var(--f-body);
+        font-weight: 700;
+        font-size: 58px;
+        color: var(--paper);
+        opacity: 0.85;
+        padding: 6px 0;
+        white-space: nowrap;
+      }
+      @keyframes roll {
+        from {
+          transform: translateY(0);
+        }
+        to {
+          transform: translateY(-50%);
+        }
+      }
+
+      /* ============================================================
+   PANEL 2 — CHAT
+   ============================================================ */
+      .p-chat {
+        background: var(--peri);
+      }
+      .p-chat .header {
+        position: absolute;
+        top: 30px;
+        left: 30px;
+        right: 30px;
+        background: var(--ink);
+        color: var(--yellow);
+        font-family: var(--f-display);
+        font-size: 96px;
+        letter-spacing: 0.1em;
+        padding: 14px 30px 8px;
+        transform: rotate(-0.8deg);
+        text-align: center;
+        z-index: 7;
+      }
+
+      /* ============================================================
+   ART PANELS
+   ============================================================ */
+      .p-board {
+        background: var(--yellow);
+      }
+      .p-board .ink-circle {
+        position: absolute;
+        left: 7%;
+        top: 26%;
+        width: 50%;
+        height: 38%;
+        border: 13px solid var(--ink);
+        border-radius: 50%;
+        transform: rotate(-6deg);
+      }
+      .p-board .title {
+        position: absolute;
+        left: 12%;
+        top: 33%;
+        font-family: var(--f-marker);
+        font-size: 190px;
+        color: var(--marker);
+        transform: rotate(-4deg);
+      }
+      .p-board .note {
+        left: 30%;
+        top: 64%;
+        font-size: 130px;
+        transform: rotate(-11deg);
+      }
+      .p-board .photo {
+        position: absolute;
+        border: 11px solid var(--ink);
+        background: var(--peri);
+        border-radius: var(--wobble-sm);
+        display: grid;
+        place-items: center;
+        font-family: var(--f-display);
+        font-size: 110px;
+        color: var(--ink);
+      }
+      .p-board svg {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+      }
+      .p-board .dash {
+        fill: none;
+        stroke: var(--ink);
+        stroke-width: 1.2;
+        stroke-dasharray: 4 3;
+        animation: march 2s linear infinite;
+      }
+      @keyframes march {
+        to {
+          stroke-dashoffset: -14;
+        }
+      }
+
+      .p-np {
+        background: var(--navy);
+      }
+      .np-label {
+        position: absolute;
+        top: 36px;
+        left: 36px;
+        font-family: var(--f-display);
+        font-size: 70px;
+        color: var(--yellow);
+        letter-spacing: 0.08em;
+      }
+      .np-track {
+        position: absolute;
+        top: 140px;
+        left: 36px;
+        right: 36px;
+        font-family: var(--f-body);
+        font-weight: 700;
+        font-size: 54px;
+        color: var(--paper);
+        opacity: 0.85;
+      }
+      .eq {
+        position: absolute;
+        bottom: 56px;
+        left: 36px;
+        right: 36px;
+        height: 260px;
+        display: flex;
+        align-items: flex-end;
+        gap: 15px;
+      }
+      .eq i {
+        flex: 1;
+        background: var(--cyan);
+        display: block;
+        height: 30%;
+        animation: eqb var(--beat-ms) var(--snap) infinite;
+      }
+      .eq i:nth-child(2n) {
+        animation-duration: calc(var(--beat-ms) * 2);
+      }
+      .eq i:nth-child(3n) {
+        animation-duration: calc(var(--beat-ms) / 2);
+        background: var(--yellow);
+      }
+      @keyframes eqb {
+        0% {
+          height: 100%;
+        }
+        60%,
+        100% {
+          height: 22%;
+        }
+      }
+
+      .p-alert {
+        background: var(--peri);
+      }
+      .p-alert .burst {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        font-family: var(--f-display);
+        font-size: 220px;
+        color: var(--yellow);
+        -webkit-text-stroke: 14px var(--ink);
+        paint-order: stroke fill;
+        z-index: 6;
+        animation: stampPulse calc(var(--beat-ms) * 2) var(--snap) infinite;
+      }
+
+      /* ============================================================
+   READOUT
+   ============================================================ */
+      .readout {
+        position: absolute;
+        right: 14px;
+        bottom: 14px;
+        background: rgba(5, 5, 10, 0.93);
+        border: 2px solid var(--cyan);
+        padding: 11px 13px;
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 11px;
+        line-height: 1.6;
+        color: var(--cyan);
+        z-index: 60;
+        pointer-events: none;
+      }
+      .readout h4 {
+        font-family: var(--f-display);
+        font-size: 14px;
+        letter-spacing: 0.14em;
+        color: var(--yellow);
+        margin-bottom: 6px;
+      }
+      .readout .off {
+        color: #4a4a55;
+      }
+      .readout[hidden] {
+        display: none;
+      }
+      .hint {
+        position: absolute;
+        left: 14px;
+        bottom: 14px;
+        font-size: 11px;
+        font-weight: 600;
+        color: rgba(244, 241, 232, 0.4);
+        z-index: 60;
+        pointer-events: none;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .page {
+          transition-duration: 0.01ms;
+        }
+        .beat-dot,
+        .panel-tag,
+        .eq i,
+        .stamp,
+        .speedlines,
+        .rays,
+        .dash,
+        .cat,
+        .credits ul,
+        .p-alert .burst {
+          animation: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <nav class="navbar">
+      <span class="nav-title">MISSION REPORT / PAN TEST</span>
+      <button class="btn page-btn" data-target="page">PAGE</button>
+      <span
+        id="panelBtns"
+        style="display: flex; gap: 9px; flex-wrap: wrap"
+      ></span>
+      <span class="spacer"></span>
+      <button class="toggle" id="fitToggle" aria-pressed="true">
+        Per-panel fit
+      </button>
+      <button class="toggle" id="coordToggle" aria-pressed="true">
+        Coords
+      </button>
+      <span class="beat-dot" aria-hidden="true"></span>
+      <span class="bpm-label">120 BPM</span>
+    </nav>
+
+    <div class="stage" id="stage">
+      <div class="viewport" id="viewport">
+        <div class="shaker" id="shaker"><div class="page" id="page"></div></div>
+      </div>
+      <div class="hint">
+        Click a panel to pan · keys 1–9 · 0 or P for the whole page
+      </div>
+      <div class="readout" id="readout">
+        <h4>OBS SOURCE RECTS</h4>
+        <div id="readoutBody"></div>
+      </div>
+    </div>
+
+    <script>
+      const PAGE_W = 7680,
+        PAGE_H = 4320,
+        CANVAS_W = 1920,
+        CANVAS_H = 1080;
+
+      /* ================================================================
+   PANEL CONFIG — single source of truth.
+
+   holes[] are transparent windows inside a panel. Each maps to one
+   OBS source by name. Coordinates are PERCENTAGES of the panel, so
+   art and hole can never drift apart when a panel is resized.
+   ================================================================ */
+      const PANELS = [
+        {
+          id: 1,
+          key: "start",
+          cls: "p-start",
+          fit: "fit",
+          x: 64,
+          y: 64,
+          w: 2360,
+          h: 1180,
+          rot: -1.0,
+          tag: "STREAM START",
+          holes: [
+            {
+              src: "Standby",
+              x: 60,
+              y: 14,
+              w: 35,
+              h: 70,
+              label: "Standby loop",
+              c: "#3a2a5c",
+            },
+          ],
+        },
+
+        {
+          id: 2,
+          key: "chat",
+          cls: "p-chat",
+          fit: "fit",
+          x: 5200,
+          y: 64,
+          w: 2416,
+          h: 3188,
+          rot: 0.8,
+          tag: "CHAT",
+          holes: [
+            {
+              src: "Chat",
+              x: 5,
+              y: 12,
+              w: 90,
+              h: 80,
+              label: "Chat browser",
+              c: "#243a2e",
+            },
+          ],
+        },
+
+        {
+          id: 3,
+          key: "game",
+          cls: "p-game",
+          fit: "fill",
+          x: 64,
+          y: 1292,
+          w: 3400,
+          h: 1960,
+          rot: 0.5,
+          tag: "GAMEPLAY",
+          speedlines: true,
+          holes: [
+            {
+              src: "Game",
+              x: 0,
+              y: 0,
+              w: 100,
+              h: 100,
+              bare: true,
+              label: "Game capture",
+              c: "#1e3a2e",
+            },
+            {
+              src: "Cam",
+              x: 70,
+              y: 60,
+              w: 27,
+              h: 35,
+              label: "Cam",
+              c: "#4a3a1e",
+            },
+          ],
+        },
+
+        {
+          id: 4,
+          key: "cam",
+          cls: "p-cam",
+          fit: "fill",
+          x: 3512,
+          y: 1292,
+          w: 1640,
+          h: 956,
+          rot: -1.4,
+          tag: "FULL CAM",
+          rays: true,
+          holes: [
+            {
+              src: "Cam",
+              x: 6,
+              y: 8,
+              w: 88,
+              h: 84,
+              label: "Webcam",
+              c: "#4a3a1e",
+            },
+          ],
+        },
+
+        {
+          id: 5,
+          key: "brb",
+          cls: "p-brb",
+          fit: "fit",
+          x: 64,
+          y: 3300,
+          w: 2360,
+          h: 956,
+          rot: 1.1,
+          tag: "BRB",
+          holes: [
+            {
+              src: "Cam",
+              x: 70,
+              y: 16,
+              w: 26,
+              h: 62,
+              label: "Cam",
+              c: "#4a3a1e",
+            },
+          ],
+        },
+
+        {
+          id: 6,
+          key: "end",
+          cls: "p-end",
+          fit: "fit",
+          x: 2472,
+          y: 3300,
+          w: 2680,
+          h: 956,
+          rot: -0.6,
+          tag: "STREAM END",
+          holes: [
+            {
+              src: "Cam",
+              x: 74,
+              y: 14,
+              w: 22,
+              h: 66,
+              label: "Cam",
+              c: "#4a3a1e",
+            },
+          ],
+        },
+
+        {
+          id: 7,
+          key: "board",
+          cls: "p-board",
+          fit: "fit",
+          x: 2472,
+          y: 64,
+          w: 2680,
+          h: 1180,
+          rot: 0.7,
+          tag: "INTEL",
+          holes: [],
+        },
+
+        {
+          id: 8,
+          key: "np",
+          cls: "p-np",
+          fit: "fit",
+          x: 5200,
+          y: 3300,
+          w: 2416,
+          h: 956,
+          rot: 1.3,
+          tag: "NOW PLAYING",
+          holes: [],
+        },
+
+        {
+          id: 9,
+          key: "alert",
+          cls: "p-alert",
+          fit: "fit",
+          x: 3512,
+          y: 2296,
+          w: 1640,
+          h: 956,
+          rot: 1.6,
+          tag: "ALERTS",
+          holes: [],
+        },
+      ];
+
+      /* Beat from a shared wall-clock epoch — no sync messages, ever. */
+      const BPM = 120,
+        BEAT_MS = 60000 / BPM,
+        EPOCH = 0;
+      const beatPhase = () => ((Date.now() - EPOCH) % BEAT_MS) / BEAT_MS;
+
+      /* ================================================================
+   PANEL ART
+   ================================================================ */
+      function artFor(p) {
+        switch (p.key) {
+          case "start":
+            return `
+      <div class="rays"></div>
+      <div class="scrawl">get comfy</div>
+      <div class="big">STAND<br>BY</div>
+      <div class="clock" id="countdown">05:00</div>`;
+          case "chat":
+            return `<div class="header">CHAT</div>`;
+          case "cam":
+            return `<div class="rays"></div>`;
+          case "brb":
+            return `
+      <div class="big">BE RIGHT<br>BACK</div>
+      <div class="cat"><span class="ear l"></span><span class="ear r"></span>
+        <span class="body"></span><span class="eye l"></span><span class="eye r"></span></div>
+      <div class="bubble" style="right:6%;top:8%;font-size:64px">mrrow</div>`;
+          case "end":
+            return `
+      <div class="big">MISSION<br>COMPLETE</div>
+      <div class="stamp rank">S</div>
+      <div class="credits"><ul>
+        <li>thanks for watching</li><li>chat MVP — you</li>
+        <li>music — 120 BPM</li><li>cat wrangling — the cat</li>
+        <li>thanks for watching</li><li>chat MVP — you</li>
+        <li>music — 120 BPM</li><li>cat wrangling — the cat</li>
+      </ul></div>`;
+          case "board":
+            return `
+      <div class="ink-circle"></div>
+      <div class="title">INTEL</div>
+      <div class="scrawl note">insider?</div>
+      <div class="photo" style="left:63%;top:8%;width:22%;height:46%">?</div>
+      <div class="photo" style="left:70%;top:60%;width:19%;height:32%">!</div>
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none">
+        <path class="dash" d="M 54 46 L 74 70"/><path class="dash" d="M 52 28 L 68 24"/>
+      </svg>`;
+          case "np":
+            return `
+      <div class="np-label">NOW PLAYING</div>
+      <div class="np-track">Untitled Sample — 120 BPM</div>
+      <div class="eq">${"<i></i>".repeat(14)}</div>`;
+          case "alert":
+            return `<div class="burst">BAM!</div>`;
+          default:
+            return "";
+        }
+      }
+
+      /* ================================================================
+   BUILD
+   ================================================================ */
+      const pageEl = document.getElementById("page"),
+        panelEls = {},
+        holeEls = [];
+
+      PANELS.forEach((p) => {
+        const el = document.createElement("div");
+        el.className = `panel ${p.cls}`;
+        el.dataset.id = p.id;
+        Object.assign(el.style, {
+          left: p.x + "px",
+          top: p.y + "px",
+          width: p.w + "px",
+          height: p.h + "px",
+          transform: `rotate(${p.rot}deg)`,
+        });
+
+        const holesHTML = (p.holes || [])
+          .map(
+            (h, i) =>
+              `<div class="hole${h.bare ? " bare" : ""}" data-hole="${p.key}:${i}"
+       style="left:${h.x}%;top:${h.y}%;width:${h.w}%;height:${h.h}%">
+       <div class="fake-source" style="--src:${h.c}">
+         <span class="src-label">${h.label}</span></div>
+     </div>`,
+          )
+          .join("");
+
+        el.innerHTML =
+          artFor(p) +
+          holesHTML +
+          (p.speedlines ? '<div class="speedlines"></div>' : "") +
+          `<span class="panel-tag">${p.tag}</span>`;
+
+        pageEl.appendChild(el);
+        panelEls[p.id] = el;
+        (p.holes || []).forEach((h, i) =>
+          holeEls.push({
+            src: h.src,
+            key: `${p.key}:${h.src}`,
+            el: el.querySelector(`[data-hole="${p.key}:${i}"]`),
+          }),
+        );
+      });
+
+      const btnWrap = document.getElementById("panelBtns");
+      PANELS.forEach((p) => {
+        const b = document.createElement("button");
+        b.className = "btn" + ((p.holes || []).length ? "" : " art");
+        b.dataset.target = String(p.id);
+        b.textContent = p.tag;
+        btnWrap.appendChild(b);
+      });
+
+      /* Countdown on the standby panel */
+      let secs = 300;
+      setInterval(() => {
+        const c = document.getElementById("countdown");
+        if (!c) return;
+        secs = secs > 0 ? secs - 1 : 300;
+        c.textContent = `${String(Math.floor(secs / 60)).padStart(2, "0")}:${String(secs % 60).padStart(2, "0")}`;
+      }, 1000);
+
+      /* ================================================================
+   PAN MATH
+     translate(viewport centre)
+     rotate(-panel tilt)      -> panel squares up to the frame
+     scale(fit)
+     translate(-panel centre)
+   ================================================================ */
+      let perPanelFit = true,
+        current = "page";
+      function transformFor(t) {
+        if (t === "page") {
+          const s = Math.min(CANVAS_W / PAGE_W, CANVAS_H / PAGE_H) * 0.94;
+          return `translate(${CANVAS_W / 2}px,${CANVAS_H / 2}px) scale(${s}) translate(${-PAGE_W / 2}px,${-PAGE_H / 2}px)`;
+        }
+        const p = PANELS.find((v) => v.id === Number(t));
+        const sx = CANVAS_W / p.w,
+          sy = CANVAS_H / p.h;
+        const mode = perPanelFit ? p.fit : "fill";
+        const s = mode === "fill" ? Math.max(sx, sy) : Math.min(sx, sy) * 0.97;
+        const cx = p.x + p.w / 2,
+          cy = p.y + p.h / 2;
+        return `translate(${CANVAS_W / 2}px,${CANVAS_H / 2}px) rotate(${-p.rot}deg) scale(${s}) translate(${-cx}px,${-cy}px)`;
+      }
+
+      const shaker = document.getElementById("shaker");
+      let shakeTimer;
+
+      function goTo(t) {
+        current = t;
+        pageEl.style.transform = transformFor(t);
+        document
+          .querySelectorAll(".btn")
+          .forEach((b) =>
+            b.classList.toggle("active", b.dataset.target === String(t)),
+          );
+        Object.entries(panelEls).forEach(([id, el]) =>
+          el.classList.toggle("is-live", id === String(t)),
+        );
+
+        clearTimeout(shakeTimer);
+        shakeTimer = setTimeout(() => {
+          shaker.classList.remove("shake");
+          void shaker.offsetWidth;
+          shaker.classList.add("shake");
+        }, 810);
+      }
+
+      document.addEventListener("click", (e) => {
+        const b = e.target.closest(".btn");
+        if (b) {
+          goTo(b.dataset.target);
+          return;
+        }
+        const pn = e.target.closest(".panel");
+        if (pn) goTo(pn.dataset.id);
+      });
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "0" || e.key.toLowerCase() === "p") return goTo("page");
+        const n = Number(e.key);
+        if (n >= 1 && n <= PANELS.length) goTo(String(n));
+      });
+
+      /* ================================================================
+   TOGGLES
+   ================================================================ */
+      const fitToggle = document.getElementById("fitToggle");
+      fitToggle.addEventListener("click", () => {
+        perPanelFit = !perPanelFit;
+        fitToggle.setAttribute("aria-pressed", String(perPanelFit));
+        fitToggle.textContent = perPanelFit
+          ? "Per-panel fit"
+          : "Fill everything";
+        goTo(current);
+      });
+      const readout = document.getElementById("readout");
+      const coordToggle = document.getElementById("coordToggle");
+      coordToggle.addEventListener("click", () => {
+        const on = readout.hasAttribute("hidden");
+        readout.toggleAttribute("hidden", !on);
+        coordToggle.setAttribute("aria-pressed", String(on));
+      });
+
+      /* ================================================================
+   PREVIEW SCALING — does not exist in OBS. Divided back out below.
+   ================================================================ */
+      const stage = document.getElementById("stage"),
+        viewport = document.getElementById("viewport");
+      let previewScale = 1;
+      function fitPreview() {
+        const pad = 40;
+        previewScale = Math.min(
+          (stage.clientWidth - pad) / CANVAS_W,
+          (stage.clientHeight - pad) / CANVAS_H,
+        );
+        viewport.style.transform = `scale(${previewScale})`;
+      }
+      addEventListener("resize", fitPreview);
+      fitPreview();
+
+      /* ================================================================
+   READOUT — per HOLE now, not per panel. Each row is one
+   SetSceneItemTransform call. Only visible holes get sent.
+   ================================================================ */
+      const readoutBody = document.getElementById("readoutBody");
+      function reportRects() {
+        const vp = viewport.getBoundingClientRect();
+        readoutBody.innerHTML = holeEls
+          .map((h) => {
+            const r = h.el.getBoundingClientRect();
+            const x = (r.left - vp.left) / previewScale,
+              y = (r.top - vp.top) / previewScale;
+            const w = r.width / previewScale,
+              hh = r.height / previewScale;
+            const vis = x < CANVAS_W && y < CANVAS_H && x + w > 0 && y + hh > 0;
+            return (
+              `<div${vis ? "" : ' class="off"'}>${h.key.padEnd(12)} ` +
+              `x:${x.toFixed(0).padStart(6)} y:${y.toFixed(0).padStart(6)} ` +
+              `w:${w.toFixed(0).padStart(5)} h:${hh.toFixed(0).padStart(5)} ` +
+              `${vis ? "SEND" : "skip"}</div>`
+            );
+          })
+          .join("");
+        requestAnimationFrame(reportRects);
+      }
+      requestAnimationFrame(reportRects);
+
+      goTo("page");
+    </script>
+  </body>
+</html>
