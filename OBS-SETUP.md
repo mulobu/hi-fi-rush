@@ -90,12 +90,12 @@ This is the only scene that ever holds anything. Everything else just points at 
 You'll probably have a leftover scene called `Scene` from install. Right-click it
 → **Remove** → confirm. Keeps the preflight check honest.
 
-### 4a. Add six placeholder sources
+### 4a. Add four placeholder sources
 
 Real cameras and capture cards can wait. Right now you want to prove the plumbing,
 and coloured rectangles do that faster — no permission prompts, no hardware.
 
-With `COMIC` selected in Scenes, do this **six times**:
+With `COMIC` selected in Scenes, do this **four times**:
 
 1. In the **Sources** panel, click **+**.
 2. Choose **Color Source**.
@@ -105,23 +105,28 @@ With `COMIC` selected in Scenes, do this **six times**:
 5. A properties window opens. Click the colour swatch, pick the listed colour,
    **OK**. Then **OK** again.
 
-| Order to add | Name      | Colour       | Why this colour                    |
-| ------------ | --------- | ------------ | ---------------------------------- |
-| 1st          | `Standby` | grey         | added first = ends up at the bottom |
-| 2nd          | `Brb`     | purple       | TitleCase, not `BRB` — see below   |
-| 3rd          | `Game`    | green        |                                     |
-| 4th          | `Cam`     | orange       | the one you'll ping in step 9      |
-| 5th          | `Chat`    | blue         |                                     |
-| 6th          | `Overlay` | yellow       | added last = ends up on top        |
+| Order to add | Name      | Colour       | Why this colour                     |
+| ------------ | --------- | ------------ | ----------------------------------- |
+| 1st          | `Game`    | green        | added first = ends up at the bottom |
+| 2nd          | `Cam`     | orange       | the one you'll ping in step 9       |
+| 3rd          | `Chat`    | blue         |                                     |
+| 4th          | `Overlay` | yellow       | added last = ends up on top         |
+
+> **Four, not six.** There were once `Standby` and `Brb` sources here as well.
+> Both are gone: a source that no hole maps to still renders behind the overlay,
+> and shows through whichever hole it happens to overlap. `Brb` did exactly that
+> through START's window; `Standby` was dropped when panel 1 switched to the
+> webcam. See `CLAUDE.md` §5 and §8. `obs-setup.py --check` names any stray it
+> finds in `COMIC`, and `--prune` removes it.
 
 > **Scenes and sources share one namespace.** In OBS a scene *is* a source
 > internally, so you cannot have a scene and a source with the same name — OBS
-> refuses the second one, usually without saying why. Since step 7 creates a
-> **scene** called `BRB`, the source here must be `Brb`.
+> refuses the second one, usually without saying why. Step 7 creates a **scene**
+> called `GAME`; the source here is `Game`, and they coexist only because the
+> lookup is case-sensitive.
 >
-> The rule for this project: **scenes UPPERCASE, sources TitleCase.** That's why
-> the scene `GAME` and the source `Game` can coexist — the comparison is
-> case-sensitive. Follow the convention and nothing ever collides.
+> The rule for this project: **scenes UPPERCASE, sources TitleCase.** Follow the
+> convention and nothing ever collides.
 
 Adding in that order gives you the right stacking for free — each new source goes
 above the previous one, so `Overlay` lands on top, which is where the real comic
@@ -129,12 +134,17 @@ art has to sit. If the order comes out wrong, drag items in the list, or select 
 and use the **∧ ∨** arrows at the bottom of the Sources panel.
 
 Your Sources list should now read, top to bottom:
-`Overlay`, `Chat`, `Cam`, `Game`, `Brb`, `Standby`.
+`Overlay`, `Chat`, `Cam`, `Game`.
+
+> **The mascot is missing on purpose.** The finished `COMIC` has a fifth source,
+> `Deer`, a browser source sitting **above** `Overlay` — above, because a punched
+> hole is a transparent rectangle and would put live video behind the mascot's
+> own alpha instead of comic art. It plays no part in this wiring test, and
+> `obs-setup.py` creates it for you. `CLAUDE.md` §2.
 
 > **Swapping in the real thing later.** On macOS the source types are:
 > `Cam` → **Video Capture Device** · `Game` → **macOS Screen Capture** (set
-> Method to Window or Application) · `Brb` / `Standby` → **Media Source** ·
-> `Chat` → **Browser**.
+> Method to Window or Application) · `Chat` → **Browser**.
 >
 > Note that `CLAUDE.md` §2 says "Game Capture" — that source type is
 > **Windows-only**. On macOS it's **macOS Screen Capture**, and it needs
@@ -369,7 +379,7 @@ right-click → **Interact** (step 9).
 
 **OBS won't create a scene — the OK button does nothing, or it says the name is
 already in use.** A source already has that exact name. Scenes and sources live in
-one namespace. Rename the source to TitleCase (`BRB` → `Brb`), then create the
+one namespace. Rename the source to TitleCase (`CHAT` → `Chat`), then create the
 scene. Case-sensitive, so `Game` and `GAME` are fine together.
 
 **Red chips under "Scenes expected" or "Sources expected".** Something's misnamed.

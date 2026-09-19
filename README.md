@@ -10,11 +10,13 @@ scene is one panel, and switching scenes pans the camera across the page.
 | [tools/obs-setup.py](tools/obs-setup.py) | The same wiring, asserted over obs-websocket |
 | [obs/comic-scenes.json](obs/comic-scenes.json) | Exported scene collection, credentials stripped |
 | [overlay.html](overlay.html) | The live overlay. Point the browser source here |
+| [vertical.html](vertical.html) | The same engine, 1080×1920, for the vertical canvas |
 | [mockup.html](mockup.html) | Standalone layout mockup |
 | [obs-test.html](obs-test.html) | Scene-detection probe used to verify §2 |
 | [tools/hero-asset.py](tools/hero-asset.py) | Turns a look-around video into a sprite sheet |
 | [mascot/](mascot/) | Cursor-following, scene-following mascot browser source |
 | [mascot/placement.json](mascot/placement.json) | Where the mascot sits, per scene |
+| [mascot/placement-vertical.json](mascot/placement-vertical.json) | The same, in the vertical canvas's pixels |
 
 ---
 
@@ -36,7 +38,13 @@ obs-websocket 5 ships inside OBS; there is nothing extra to install. Neither
 script needs `pip install` — standard library only. `ffmpeg` is needed only to
 build a *new* sprite sheet, never to run the overlay.
 
-On Windows substitute `py -3` for `python3` in everything below.
+**OBS 32+ if you want the vertical output**, plus the Aitum Vertical Canvas
+plugin — step 9. 31 is enough for everything else.
+
+On Windows substitute `py -3` for `python3` in everything below. `python3` is
+not a command there: Windows ships a `py` launcher instead, and the bare names
+`python` / `python3` hit a Microsoft Store stub that installs nothing and exits
+0, which looks like a script that did nothing rather than one that never ran.
 
 ## 2. Clone it
 
@@ -98,11 +106,47 @@ The script cannot guess these. In OBS, double-click each and pick:
 | `Game` | the display, window, or game to capture |
 | `Cam` | your webcam |
 | `Chat` | your chat widget URL |
-| `Standby` | a looping video for the countdown panel |
 
 Sizes do not matter. The overlay crops and fits every source into its hole.
 
-## 6. Start the mascot bridge
+## 6. Put the encode on the GPU
+
+```bash
+python3 tools/obs-setup.py --encoder auto
+```
+
+A fresh OBS encodes on the CPU, with x264. That is the wrong place for it here:
+the pan is a 7680×4320 CSS transform running inside CEF, and Source Record adds
+an output per source on top of the program encode. `auto` picks the best
+hardware encoder *this* OBS reports — NVENC, then QuickSync, then AMD, then
+VideoToolbox — and sets it for both the stream and the recording. Name one
+instead if you would rather: `--encoder nvenc | qsv | amd | apple | x264`.
+
+It asks OBS what it has rather than guessing from the GPU, because a card that
+supports NVENC is not the same thing as an OBS that registered it — a driver
+too old, a plugin that failed to load, and the encoder is simply not there. If
+you ask for one this OBS did not register, the script says so and changes
+nothing.
+
+An ordinary run without the flag still does two things:
+
+- **Rewrites a deprecated encoder ID.** `jim_nvenc` is the pre-OBS-30 name for
+  `obs_nvenc_h264_tex`. OBS still accepts it, maps it to the same encoder, and
+  logs `Encoder ID 'jim_nvenc' is deprecated and may be removed in a future
+  version` once per output per launch. Renaming it changes nothing about the
+  encode, so it happens without being asked.
+- **Reports a software encoder** if a hardware one is sitting unused.
+
+It never switches encoder on its own, because x264 can be a deliberate choice —
+a dedicated encoding PC, or a recording you want CPU quality for — and this
+script does not overwrite deliberate choices.
+
+**Bitrate, preset and tuning are yours.** They live in the profile's
+`streamEncoder.json`, which no websocket request can reach, and they are a
+judgement about your upload and your GPU that a repo has no business making.
+Settings → Output, with the encoder already correct.
+
+## 7. Start the mascot bridge
 
 ```bash
 python3 mascot/bridge/cursor-bridge.py
@@ -114,10 +158,60 @@ keeps asking for its sprite sheet and appears the moment the bridge is up.
 More than one display? `--list-displays`, then `--display N` for the one OBS is
 capturing.
 
-## 7. Map the Stream Deck
+## 8. Map the Stream Deck
 
 One button per scene: `START` `GAME` `CAM` `BRB` `CHAT` `END`. Plain OBS
 "Scene" actions — the overlay hears the switch and pans itself.
+
+## 9. Vertical output, if you want it
+
+Optional, and entirely separate from everything above — skip it and the
+horizontal overlay is unaffected.
+
+A second 1080×1920 canvas, so one Stream Deck press moves both pages at once.
+It is a second canvas rather than a second profile because base resolution is
+*per profile*: switching profiles to go vertical would resize the canvas under
+the horizontal overlay and every hole rect it has pushed.
+
+1. **Install [Aitum Vertical Canvas](https://github.com/Aitum/obs-vertical-canvas)**,
+   then **restart OBS**. Plugins bind at process start; nothing appears until
+   you do.
+2. In the new **Vertical** dock, add a canvas and set it to **1080×1920**.
+   `obs-setup.py` cannot do this — obs-websocket has no request that sets a
+   canvas resolution — so it checks it and complains if it is anything else.
+3. ```bash
+   python3 tools/obs-setup.py --vertical
+   ```
+   This renames the plugin's own scene to `VCOMIC`, adds `Game` / `Cam` /
+   `Chat` — the *same inputs* the horizontal canvas uses, with independent
+   scene items, so the two overlays cannot fight over a transform — and creates
+   the `OverlayV` and `DeerV` browser sources above them.
+4. **Click `VCOMIC` in the Aitum dock.** This is the one step nothing can
+   automate. `SetCurrentProgramScene` refuses a scene that is not on the main
+   canvas, `GetCurrentProgramScene` ignores the canvas argument and answers for
+   the main one, and the plugin registers no websocket vendor and no
+   scene-switching hotkey. Until you click it, `VCOMIC` is not on air, its
+   sources never activate, and the vertical overlay never boots — silently. The
+   script infers it from whether `OverlayV` has activated and says so.
+5. Set the vertical output's server and key in the dock's own output settings.
+
+There are no trigger scenes on the vertical canvas and it never switches:
+`vertical.html` reads the **main** canvas's program scene and pans itself, so
+`VCOMIC` sits on air forever and step 4 is a once-ever click.
+
+### What does not carry across
+
+- **Aitum keeps its outputs in its own plugin config**, not in the OBS profile
+  — bitrate, server, and your **stream key in clear text**. `--export` does not
+  touch that file and neither does anything else here; it is per-machine, and
+  it must never be committed.
+- The encoder stored there is only read when **Advanced** is ticked in Aitum's
+  output settings. With it off the plugin picks one itself, which means a
+  config can sit for months reading `ffmpeg_svt_av1` and encode on the GPU
+  anyway — right up until somebody ticks Advanced and puts a second 1080×1920
+  encode on the CPU. `--vertical` reports it either way.
+- A second encode is a second encoder session. `CLAUDE.md` §6 names encoder
+  count as the real ceiling, not GPU load.
 
 ## Carrying your OBS settings across too
 
@@ -134,9 +228,12 @@ commit. On the new machine:
 
 1. OBS → **Scene Collection → Import** → pick `obs/comic-scenes.json`.
 2. Switch to the imported collection ("Comic Overlay").
-3. `python3 tools/obs-setup.py` — repairs the two browser URLs, which the
-   export deliberately left as tokens.
-4. Point `Game` / `Cam` / `Chat` / `Standby` at your hardware, as in step 5.
+3. `python3 tools/obs-setup.py` — repairs the browser URLs, which the export
+   deliberately left as tokens: two for `Overlay` and `Deer`, or four with
+   `--vertical`, which adds `OverlayV` and `DeerV`.
+4. Point `Game` / `Cam` / `Chat` at your hardware, as in step 5.
+5. `--encoder auto` and the Aitum setup do not ride along in the collection —
+   steps 6 and 9 again, on the new machine.
 
 ### What the export strips, and why it has to
 
@@ -171,8 +268,8 @@ ran the script, both came back correct and the overlay rendered.
 
   ```
   error: Untitled.json is stale -- OBS has changes it has not written out yet.
-         on disk : Standby < Brb < Game < Cam < Chat < WiringTest < Overlay < Deer
-         in OBS  : Standby < Game < Cam < Chat < Overlay < Deer
+         on disk : Game < Brb < Cam < Chat < WiringTest < Overlay < Deer
+         in OBS  : Game < Cam < Chat < Overlay < Deer
   ```
 
   Two ways to clear it. Quit OBS — it saves on a clean exit — and run `--export`
@@ -188,7 +285,7 @@ the cam, noise suppression to the mic, or a hotkey.
 
 ## What the script does *not* do
 
-Four things, and `--check` names three of them:
+Seven things, and `--check` names five of them:
 
 | Not automated | Why |
 | --- | --- |
@@ -196,6 +293,9 @@ Four things, and `--check` names three of them:
 | Canvas 1920×1080 (step 3) | Reported, not set. Rescaling someone's canvas is not a thing a setup script should do behind their back — say the word and I'll make it a flag |
 | Browser Source Hardware Acceleration (step 3) | In OBS's app-wide `global.ini`, not the profile, so there is no websocket request for it. Reported only |
 | Capture device selection (step 5) | Machine-specific by definition |
+| Bitrate, preset, tuning (step 6) | In the profile's `streamEncoder.json`, which the websocket cannot reach — and a judgement about your upload, not a fact about the overlay |
+| The vertical canvas's resolution (step 9) | No obs-websocket request sets one. Reported against 1080×1920 |
+| Putting `VCOMIC` on air (step 9) | Refused for a non-main canvas, unreadable back, no vendor, no hotkey. Inferred from whether `OverlayV` activated |
 
 Also deliberately per-machine, so not in the repo:
 

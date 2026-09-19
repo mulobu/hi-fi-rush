@@ -14,6 +14,10 @@ clicking. See CLAUDE.md §2 for why the shape is what it is.
     python3 tools/obs-setup.py --placeholders   colour blocks, no hardware
     python3 tools/obs-setup.py --prune          also remove strays from COMIC
     python3 tools/obs-setup.py --export         write obs/comic-scenes.json
+    python3 tools/obs-setup.py --vertical       also build VCOMIC on the
+                                                vertical canvas
+    python3 tools/obs-setup.py --encoder auto   pick the best hardware encoder
+                                                OBS reports on this machine
 
 Standard library only -- no pip install. The obs-websocket client below is
 about eighty lines because a dependency you have to explain in a README is
@@ -54,6 +58,96 @@ TRIGGERS = ["START", "CHAT", "GAME", "CAM", "BRB", "END"]
 # hole would be a transparent rectangle instead of a sprite on comic art.
 MASCOT_PORT = 4460
 
+# --- vertical canvas -------------------------------------------------------
+# A second 1080x1920 canvas, added by the Aitum Vertical Canvas plugin, which
+# builds on OBS 32's native canvas API rather than running its own -- which is
+# why the standard websocket requests can see into it at all.
+#
+# Measured on OBS 32.2.2 / obs-websocket 5.7.4: CreateScene, CreateSceneItem,
+# SetSceneItemIndex and SetSceneItemTransform all work there, but ONLY by uuid.
+# canvasName is silently ignored -- GetSceneList {canvasName: "Aitum Vertical"}
+# hands back Main's scene list with no error -- and vertical scenes cannot be
+# addressed by sceneName at all, because name lookup resolves within Main only.
+# The uuid is random per scene collection, so it is discovered every run and
+# never written down. See CLAUDE.md §2.
+VERT_W, VERT_H = 1080, 1920
+
+# Not COMIC: OBS shares one source namespace across canvases too, and a scene
+# is a source internally.
+VERT_SCENE = "VCOMIC"
+
+# Bottom to top. The same inputs COMIC uses -- one input referenced from both
+# canvases, with independent scene items, so the horizontal and vertical
+# overlays cannot fight over a transform. No trigger scenes here: the vertical
+# canvas needs exactly one scene and never switches, because vertical.html
+# reads the MAIN canvas's program scene to decide where to pan.
+#
+# DeerV is last for the same reason Deer is last in COMIC: above the overlay,
+# because a punched hole is a transparent rectangle and would put live video
+# behind the mascot's own alpha instead of comic art.
+VERT_STACK = ["Game", "Cam", "Chat", "OverlayV", "DeerV"]
+VERT_MANAGED = set(VERT_STACK)
+
+
+# --- encoders --------------------------------------------------------------
+# The pan is a CSS transform on a 7680x4320 page inside CEF, and Source Record
+# adds an output per source on top of the program encode. The CPU has enough to
+# do; the encode belongs on the GPU. CLAUDE.md §6 already names encoder count as
+# the real ceiling.
+#
+# Only the encoder ID is asserted here, never bitrate, preset or tuning. Those
+# live in the profile's streamEncoder.json / recordEncoder.json, which no
+# websocket request can reach -- and they are a judgement call about your
+# upload and your GPU, which a repo has no business making for you.
+
+# Pre-OBS-30 IDs. OBS still accepts each one and silently maps it to the value
+# on the right, logging "Encoder ID 'x' is deprecated and may be removed in a
+# future version" once per output per launch. Rewriting them is a rename, not a
+# change of encoder, which is why it happens on an ordinary run.
+DEPRECATED_ENCODERS = {
+    "jim_nvenc": "obs_nvenc_h264_tex",
+    "jim_hevc_nvenc": "obs_nvenc_hevc_tex",
+    "jim_av1_nvenc": "obs_nvenc_av1_tex",
+    "ffmpeg_nvenc": "obs_nvenc_h264_tex",
+    "obs_qsv11": "obs_qsv11_v2",
+}
+
+# Best first, for --encoder auto. H.264 only: YouTube and Twitch both take it
+# everywhere, and an HEVC or AV1 ingest is a decision about your service, not
+# about this overlay.
+HW_PREFERENCE = [
+    "obs_nvenc_h264_tex",   # NVIDIA
+    "obs_qsv11_v2",         # Intel QuickSync
+    "h264_texture_amf",     # AMD
+    "com.apple.videotoolbox.videoencoder.ave.avc",
+    "obs_x264",             # software, and the OBS default
+]
+
+# Simple output mode stores a short token instead of the encoder ID.
+SIMPLE_TOKEN = {
+    "obs_nvenc_h264_tex": "nvenc",
+    "obs_qsv11_v2": "qsv",
+    "h264_texture_amf": "amd",
+    "com.apple.videotoolbox.videoencoder.ave.avc": "apple_h264",
+    "obs_x264": "x264",
+}
+SIMPLE_ID = {v: k for k, v in SIMPLE_TOKEN.items()}
+# Simple mode's own deprecated spellings.
+SIMPLE_ID.update({"jim_nvenc": "obs_nvenc_h264_tex", "nvenc": "obs_nvenc_h264_tex",
+                  "amd_h264": "h264_texture_amf"})
+
+SOFTWARE_ENCODERS = {"obs_x264", "ffmpeg_svt_av1", "ffmpeg_aom_av1"}
+
+# What --encoder accepts. "auto" is the first entry of HW_PREFERENCE this
+# machine actually has.
+ENCODER_CHOICES = {
+    "nvenc": "obs_nvenc_h264_tex",
+    "qsv": "obs_qsv11_v2",
+    "amd": "h264_texture_amf",
+    "apple": "com.apple.videotoolbox.videoencoder.ave.avc",
+    "x264": "obs_x264",
+}
+
 
 def stack(placeholders: bool):
     """The COMIC scene, bottom item first."""
@@ -61,7 +155,6 @@ def stack(placeholders: bool):
     win = sys.platform.startswith("win")
     return [
         # name        real kind                              placeholder colour
-        ("Standby", video or "ffmpeg_source", 0xFF858585),
         ("Game", video or ("game_capture" if win else "screen_capture"), 0xFF10DA16),
         ("Cam", video or ("dshow_input" if win else "av_capture_input_v2"), 0xFF3C8BDA),
         ("Chat", video or "browser_source", 0xFFDA2624),
@@ -72,7 +165,29 @@ def stack(placeholders: bool):
 
 # Sources the overlay positions through obs-websocket. Anything else in COMIC
 # is a stray as far as this script is concerned.
-MANAGED = {"Standby", "Game", "Cam", "Chat", "Overlay", "Deer"}
+MANAGED = {"Game", "Cam", "Chat", "Overlay", "Deer"}
+
+
+# The chat hole is punched, so the widget's own page is what shows through it.
+# A transparent chat box therefore reads as a black rectangle cut out of the
+# panel, not as chat floating on comic art -- hence the opaque --peri ground,
+# which is the chat panel's own background colour.
+#
+# The rest strips YouTube's popout chrome, measured against a live
+# youtube.com/live_chat?v=...&is_popout=1 page: #panel-pages is the "Sign in to
+# chat" footer, #show-more the jump-to-latest pill. With the header and footer
+# hidden the message list reflows to the full height on its own. The selectors
+# are inert for any other provider, so this is safe to leave set.
+CHAT_CSS = """\
+body { background: #b9c3d6 !important; margin: 0; overflow: hidden; }
+yt-live-chat-header-renderer, #panel-pages, #show-more,
+yt-live-chat-banner-manager { display: none !important; }
+yt-live-chat-renderer, #chat, #contents, #item-list, #item-scroller, #items,
+yt-live-chat-item-list-renderer { background: transparent !important; }
+#item-scroller { overflow: hidden !important; }
+yt-live-chat-text-message-renderer { font-size: 20px !important; padding: 5px 10px !important; }
+yt-live-chat-text-message-renderer #author-name { color: #16161d !important; font-weight: 700 !important; }
+yt-live-chat-text-message-renderer #message { color: #16161d !important; }"""
 
 
 # ---------------------------------------------------------------------------
@@ -256,19 +371,28 @@ def collection_path(name: str = "") -> Path:
     files = sorted(p for p in d.glob("*.json") if p.suffix == ".json")
     if not files:
         raise SystemExit("error: no scene collection found in %s" % d)
+    def display(f: Path) -> str:
+        try:
+            return json.loads(f.read_text()).get("name") or f.stem
+        except Exception:
+            return f.stem
+
     if name:
+        # Either spelling. OBS's display name can hold spaces that the filename
+        # replaces with underscores, and the listing below has to print one of
+        # them -- so whatever it prints must also be accepted back.
         for f in files:
-            try:
-                if json.loads(f.read_text()).get("name") == name:
-                    return f
-            except Exception:
-                pass
-        raise SystemExit("error: no collection named %r in %s" % (name, d))
+            if name in (display(f), f.stem):
+                return f
+        raise SystemExit(
+            "error: no collection named %r in %s\n       have: %s"
+            % (name, d, ", ".join(sorted({display(f) for f in files})))
+        )
     if len(files) > 1:
         raise SystemExit(
             "error: %d collections in %s -- name the one you want with "
             "--collection\n       %s"
-            % (len(files), d, ", ".join(f.stem for f in files))
+            % (len(files), d, ", ".join(sorted({display(f) for f in files})))
         )
     return files[0]
 
@@ -329,6 +453,23 @@ def live_shape(a):
         return None
     try:
         scenes = {x["sceneName"] for x in obs.req("GetSceneList")["scenes"]}
+        # Every canvas, not just Main. One scene collection file holds the
+        # scenes of all of them -- a vertical canvas is a native libobs canvas,
+        # so VCOMIC is written into the same JSON -- while GetSceneList without
+        # a canvasUuid answers for Main alone. Compare those two and the file
+        # looks permanently stale by exactly the vertical scenes, which is a
+        # refusal to export that no amount of quitting OBS can clear.
+        #
+        # GetCanvasList is OBS 32 / obs-websocket 5.7; older builds have no
+        # second canvas to miss.
+        try:
+            for c in obs.req("GetCanvasList")["canvases"]:
+                if c.get("canvasFlags", {}).get("MAIN"):
+                    continue
+                scenes |= {x["sceneName"] for x in obs.req(
+                    "GetSceneList", {"canvasUuid": c["canvasUuid"]})["scenes"]}
+        except ObsError:
+            pass
         items = obs.req("GetSceneItemList", {"sceneName": HOST_SCENE})["sceneItems"]
         stack_ = [i["sourceName"] for i in
                   sorted(items, key=lambda i: i["sceneItemIndex"])]
@@ -484,8 +625,48 @@ def browser_settings(name: str, pw: str) -> dict:
             "restart_when_active": False,
             "reroute_audio": False,
         }
+    if name == "OverlayV":
+        # Same file:// reasoning as Overlay.
+        #
+        # reroute_audio stays FALSE. Alert audio rides the horizontal Overlay
+        # (CLAUDE.md §4); a second rerouted browser source would put every
+        # alert sound into the mix twice.
+        url = (REPO / "vertical.html").as_uri()
+        if pw:
+            url += "?pw=" + urllib.parse.quote(pw)
+        return {
+            "url": url,
+            "width": VERT_W,
+            "height": VERT_H,
+            "shutdown": False,
+            "restart_when_active": False,
+            "reroute_audio": False,
+        }
+    if name == "DeerV":
+        # The vertical twin of Deer. Same bridge, same sprite set, different
+        # placement file -- mascot.html needed no changes, because it already
+        # takes `place` and sizes itself from innerWidth/innerHeight.
+        url = ("http://127.0.0.1:%d/mascot.html?set=deer"
+               "&place=placement-vertical.json" % MASCOT_PORT)
+        if pw:
+            url += "&pw=" + urllib.parse.quote(pw)
+        return {
+            "url": url,
+            "width": VERT_W,
+            "height": VERT_H,
+            "shutdown": False,
+            "restart_when_active": False,
+            "reroute_audio": False,
+        }
     if name == "Chat":
-        return {"url": "about:blank", "width": 800, "height": 1200,
+        # 800x938 is the chat hole's own aspect (2174 x 2550 page px). The
+        # source is cropped to that aspect before it is stretched, so any
+        # other shape throws away chat rather than letterboxing it.
+        # The hole is punched, so the widget's page is what shows -- a
+        # transparent chat box would read as a black rectangle cut out of the
+        # panel. --peri is the chat panel's own background.
+        return {"url": "about:blank", "width": 800, "height": 938,
+                "css": CHAT_CSS,
                 "shutdown": False, "restart_when_active": False}
     return {}
 
@@ -507,6 +688,17 @@ def main() -> None:
                          "machine with no capture hardware yet")
     ap.add_argument("--prune", action="store_true",
                     help="remove items from COMIC that this overlay does not manage")
+    ap.add_argument("--encoder", default="", metavar="WHICH",
+                    choices=["", "auto"] + sorted(ENCODER_CHOICES),
+                    help="set the stream and recording video encoder: auto "
+                         "(best hardware encoder this OBS reports), or one of "
+                         "%s. Without it, a deprecated encoder ID is still "
+                         "rewritten and a software encoder is reported."
+                         % "/".join(sorted(ENCODER_CHOICES)))
+    ap.add_argument("--vertical", action="store_true",
+                    help="also assert %s on the vertical canvas, for streaming "
+                         "9:16 alongside. Needs the Aitum Vertical Canvas "
+                         "plugin and a canvas added in its dock." % VERT_SCENE)
     ap.add_argument("--export", action="store_true",
                     help="write a sanitised copy of the scene collection to "
                          "obs/comic-scenes.json and exit. Strips credentials and "
@@ -606,7 +798,10 @@ def main() -> None:
         if not want or inputs.get(name) != "browser_source":
             continue
         if name == "Chat":
-            want = {k: want[k] for k in ("shutdown", "restart_when_active")}
+            # Everything but the url, which is yours -- your channel, your
+            # widget provider. The rest is derived from the hole.
+            want = {k: want[k] for k in
+                    ("width", "height", "css", "shutdown", "restart_when_active")}
         have = obs.req("GetInputSettings", {"inputName": name})["inputSettings"]
         diff = {k: v for k, v in want.items() if have.get(k) != v}
         # OBS omits defaults from the settings blob, so absent == the default.
@@ -716,6 +911,14 @@ def main() -> None:
                       "nothing but the nested host scene"
                       % (name, extra["sourceName"], HOST_SCENE))
 
+    # --- vertical canvas ---------------------------------------------------
+    # After COMIC, because it reuses the very inputs that phase creates.
+    if a.vertical:
+        do_vertical(obs, plan, a, pw)
+
+    # --- encoder -----------------------------------------------------------
+    do_encoder(obs, plan, a)
+
     # --- transition --------------------------------------------------------
     # The pan IS the transition. Anything else double-animates the switch.
     tr = obs.req("GetCurrentSceneTransition")
@@ -727,6 +930,403 @@ def main() -> None:
 
     report(plan, a)
     obs.ws.close()
+
+
+def vertical_canvas(obs):
+    """The canvas that is not Main, by uuid. Never matched by name -- OBS
+    accepts canvasName and then ignores it."""
+    for c in obs.req("GetCanvasList")["canvases"]:
+        if not c.get("canvasFlags", {}).get("MAIN"):
+            return c
+    return None
+
+
+def do_vertical(obs, plan: Plan, a, pw: str) -> None:
+    """Assert VCOMIC on the vertical canvas.
+
+    Everything here addresses the canvas by uuid and the scene by uuid, for the
+    reasons in the VERT_SCENE block above. Runs after the COMIC phase because
+    it reuses Game / Cam / Chat, which that phase creates.
+    """
+    cv = vertical_canvas(obs)
+    if cv is None:
+        plan.warn(
+            "no second canvas exists, so there is nothing to build on. Install "
+            "the Aitum Vertical Canvas plugin, restart OBS -- plugins bind at "
+            "process start -- and add a canvas in its dock. --vertical does the "
+            "rest."
+        )
+        return
+
+    cu = cv["canvasUuid"]
+    vs = cv["canvasVideoSettings"]
+    if (vs["baseWidth"], vs["baseHeight"]) != (VERT_W, VERT_H):
+        plan.warn(
+            "vertical canvas %r is %dx%d, vertical.html assumes %dx%d -- every "
+            "hole rect it pushes is in canvas pixels, so they would all be "
+            "wrong. Fix it in the Aitum dock; obs-websocket has no request that "
+            "can set a canvas resolution."
+            % (cv["canvasName"], vs["baseWidth"], vs["baseHeight"], VERT_W, VERT_H)
+        )
+
+    def vscenes():
+        return {x["sceneName"]: x["sceneUuid"]
+                for x in obs.req("GetSceneList", {"canvasUuid": cu})["scenes"]}
+
+    # --- the scene ---------------------------------------------------------
+    # RENAME what the plugin already owns; do not CreateScene if it can be
+    # avoided. A scene made over the websocket is real -- libobs has it and
+    # GetSceneList returns it -- but the Aitum dock never learns about it. Its
+    # config stores only `current_scene` and no scene list, so it enumerates
+    # the canvas once at load and otherwise tracks only what its own UI made.
+    # A created scene is therefore invisible in the dock, cannot be selected,
+    # and so can never go on air: its sources stay inactive and the vertical
+    # overlay never even boots.
+    #
+    # Renaming the plugin's own default scene sidesteps all of that. The uuid
+    # is preserved, so it stays whatever the canvas already had on air -- which
+    # for a fresh canvas is exactly the scene we want to become VCOMIC.
+    have = vscenes()
+    if VERT_SCENE not in have:
+        spare = [n for n in have if n != VERT_SCENE]
+        if len(spare) == 1:
+            old = spare[0]
+            plan.do(
+                "rename vertical scene %r -> %s (keeps its uuid, so it stays "
+                "the canvas's current scene)" % (old, VERT_SCENE),
+                lambda u=have[old]: obs.req(
+                    "SetSceneName", {"sceneUuid": u, "newSceneName": VERT_SCENE}),
+            )
+        elif not spare:
+            plan.do(
+                "create scene %s on %s" % (VERT_SCENE, cv["canvasName"]),
+                lambda: obs.req("CreateScene",
+                                {"sceneName": VERT_SCENE, "canvasUuid": cu}),
+            )
+            plan.warn(
+                "%s had to be CREATED rather than renamed, because the canvas "
+                "had no scene to rename. The Aitum dock will not list it until "
+                "OBS restarts and the plugin re-enumerates the canvas."
+                % VERT_SCENE
+            )
+        else:
+            plan.warn(
+                "the vertical canvas holds %d scenes (%s) and none is called %s, "
+                "so there is no single obvious one to rename. Rename one to %s "
+                "in the Aitum dock and re-run."
+                % (len(spare), ", ".join(sorted(spare)), VERT_SCENE, VERT_SCENE)
+            )
+            return
+        if a.check:
+            # Nothing below can be checked against a scene that is not there yet.
+            return
+        have = vscenes()
+    su = have[VERT_SCENE]
+
+    # --- OverlayV ----------------------------------------------------------
+    inputs = {i["inputName"]: i["inputKind"] for i in obs.req("GetInputList")["inputs"]}
+    made = False
+    for vname in ("OverlayV", "DeerV"):
+        if vname not in inputs:
+            plan.do(
+                "create input %s (browser_source)" % vname,
+                lambda n=vname: obs.req(
+                    "CreateInput",
+                    {"sceneUuid": su, "inputName": n,
+                     "inputKind": "browser_source",
+                     "inputSettings": browser_settings(n, pw),
+                     "sceneItemEnabled": True},
+                ),
+            )
+            made = True
+            if not a.check:
+                inputs[vname] = "browser_source"
+        elif inputs[vname] != "browser_source":
+            plan.warn(
+                "%s exists as %s, not browser_source -- left alone. Delete it "
+                "in OBS and re-run if you want this script to make it."
+                % (vname, inputs[vname])
+            )
+    if made and a.check:
+        return
+
+    # Asserted every run, same as Overlay: a stale url, or "Shutdown source when
+    # not visible" left ticked, breaks the vertical overlay in ways that look
+    # like an overlay bug.
+    for vname in ("OverlayV", "DeerV"):
+        if inputs.get(vname) != "browser_source":
+            continue
+        want = browser_settings(vname, pw)
+        held = obs.req("GetInputSettings", {"inputName": vname})["inputSettings"]
+        diff = {k: v for k, v in want.items() if held.get(k) != v}
+        # OBS omits defaults from the settings blob, so absent == the default.
+        diff = {k: v for k, v in diff.items() if not (k not in held and v is False)}
+        if diff:
+            plan.do(
+                "%s: set %s" % (vname, ", ".join(sorted(diff))),
+                lambda n=vname, d=diff: obs.req(
+                    "SetInputSettings", {"inputName": n, "inputSettings": d}),
+            )
+
+    # --- contents and z-order ---------------------------------------------
+    items = obs.req("GetSceneItemList", {"sceneUuid": su})["sceneItems"]
+    by_name = {i["sourceName"]: i for i in items}
+
+    for name in VERT_STACK:
+        if name not in by_name and name in inputs:
+            plan.do(
+                "add %s to %s" % (name, VERT_SCENE),
+                lambda n=name: obs.req(
+                    "CreateSceneItem",
+                    {"sceneUuid": su, "sourceName": n, "sceneItemEnabled": True}),
+            )
+
+    strays = sorted(set(by_name) - VERT_MANAGED)
+    for name in strays:
+        if a.prune:
+            plan.do(
+                "remove %s from %s" % (name, VERT_SCENE),
+                lambda i=by_name[name]["sceneItemId"]: obs.req(
+                    "RemoveSceneItem", {"sceneUuid": su, "sceneItemId": i}),
+            )
+        else:
+            plan.warn(
+                "%s sits in %s but no hole maps to it. It renders behind the "
+                "vertical overlay and shows through whatever hole it happens to "
+                "overlap. Re-run with --prune to remove it." % (name, VERT_SCENE)
+            )
+
+    if not a.check or all(n in by_name for n in VERT_STACK):
+        items = obs.req("GetSceneItemList", {"sceneUuid": su})["sceneItems"]
+        by_name = {i["sourceName"]: i for i in items}
+        want_order = [n for n in VERT_STACK if n in by_name]
+        have_order = [i["sourceName"] for i in
+                      sorted(items, key=lambda i: i["sceneItemIndex"])
+                      if i["sourceName"] in want_order]
+        if have_order != want_order:
+            plan.do(
+                "restack %s: %s" % (VERT_SCENE, " < ".join(want_order)),
+                lambda: [
+                    obs.req("SetSceneItemIndex",
+                            {"sceneUuid": su,
+                             "sceneItemId": by_name[n]["sceneItemId"],
+                             "sceneItemIndex": i})
+                    for i, n in enumerate(want_order)
+                ],
+            )
+
+    vertical_output_check(plan)
+
+    # Whether VCOMIC is actually on air cannot be read back: SetCurrentProgramScene
+    # refuses a non-main scene ("The specified scene is not from the main
+    # canvas"), GetCurrentProgramScene ignores canvasUuid and reports Main's,
+    # and none of the plugin's 14 hotkeys switches a scene. So this is reported
+    # from the one thing that IS observable -- whether OverlayV has activated.
+    # Renaming rather than creating the scene normally makes it moot.
+    if not obs.req("GetSourceActive", {"sourceName": "OverlayV"})["videoActive"]:
+        plan.warn(
+            "OverlayV is not active, which means %s is not on air on the "
+            "vertical canvas -- so the vertical overlay is not running at all. "
+            "Select %s in the Aitum Vertical dock. This is the one step no "
+            "request, vendor or hotkey can perform."
+            % (VERT_SCENE, VERT_SCENE)
+        )
+
+
+def vertical_output_check(plan: Plan) -> None:
+    """Report on the vertical canvas's own output settings. Never writes.
+
+    Aitum keeps its outputs in its own plugin config, not in the OBS profile, so
+    do_encoder cannot reach them and neither can `--export`: that file holds
+    your stream key in clear text, which is reason enough for this function to
+    be read-only and for the file to stay out of the repo.
+
+    The trap worth naming is that `stream_encoder` is only consulted when
+    `stream_advanced_settings` is on. With it off, Aitum picks an encoder itself
+    and whatever is stored is inert -- so a config can sit there for months
+    reading `ffmpeg_svt_av1` (CPU AV1) and encode on the GPU regardless, right
+    up until somebody ticks Advanced.
+    """
+    cfg = obs_config_dir() / "plugin_config/vertical-canvas/config.json"
+    try:
+        doc = json.loads(cfg.read_text(errors="replace"))
+    except (OSError, ValueError):
+        return
+
+    for canvas in doc.get("canvas", []):
+        if (canvas.get("width"), canvas.get("height")) != (VERT_W, VERT_H):
+            continue
+        enc = canvas.get("stream_encoder") or ""
+        if not canvas.get("stream_advanced_settings"):
+            if enc in SOFTWARE_ENCODERS:
+                plan.warn(
+                    "the vertical canvas has %r stored as its stream encoder. It "
+                    "is inert right now -- Aitum only reads it when Advanced is "
+                    "ticked in its output settings -- but tick that and the "
+                    "vertical output moves onto the CPU. Set it to a hardware "
+                    "encoder there while you are thinking about it." % enc
+                )
+        elif enc in SOFTWARE_ENCODERS:
+            plan.warn(
+                "the vertical canvas is set to Advanced and encodes on %r, a "
+                "software encoder. That is a second 1080x1920 encode on the CPU, "
+                "on top of the program encode. Change it in the Aitum dock's "
+                "output settings." % enc
+            )
+
+
+def available_encoders() -> set:
+    """Video encoder IDs this OBS actually registered, read out of its own log.
+
+    obs-websocket has no request for this. GetVersion reports requests and image
+    formats; GetInputKindList reports sources. Nothing reports encoders, so the
+    log is the only place OBS says which ones the hardware and the installed
+    plugins gave it. It prints the list at every startup:
+
+        Available Encoders:
+          Video Encoders:
+            - obs_nvenc_h264_tex (NVIDIA NVENC H.264)
+            - obs_x264 (x264)
+          Audio Encoders:
+
+    Newest log first, skipping any that has no such block -- the very newest is
+    often a two-line crash stub from the previous run. An empty set means "could
+    not tell", never "none available", and every caller treats it that way.
+    """
+    logs = obs_config_dir() / "logs"
+    try:
+        files = sorted(logs.glob("*.txt"), key=lambda f: f.stat().st_mtime, reverse=True)
+    except OSError:
+        return set()
+    for f in files[:12]:
+        found, inside = set(), False
+        try:
+            text = f.read_text(errors="replace")
+        except OSError:
+            continue
+        for line in text.splitlines():
+            body = line.split(": ", 1)[-1]
+            if body.strip() == "Video Encoders:":
+                inside = True
+                continue
+            if inside:
+                stripped = body.strip()
+                if stripped.startswith("- "):
+                    found.add(stripped[2:].split(" (", 1)[0])
+                    continue
+                break
+        if found:
+            return found
+    return set()
+
+
+# Profile keys per output mode. Simple mode stores a short token, Advanced the
+# encoder ID itself, which is why every read goes through resolve_encoder().
+ENCODER_KEYS = {
+    False: ("AdvOut", "Encoder", "RecEncoder"),       # Advanced
+    True: ("SimpleOutput", "StreamEncoder", "RecEncoder"),
+}
+
+
+def resolve_encoder(raw: str, simple: bool) -> str:
+    """Whatever the profile holds -> the canonical modern encoder ID."""
+    if not raw:
+        return "obs_x264"   # OBS's own default, in both modes
+    if simple:
+        return SIMPLE_ID.get(raw, raw)
+    return DEPRECATED_ENCODERS.get(raw, raw)
+
+
+def do_encoder(obs, plan: Plan, a) -> None:
+    """Assert the video encoder for the stream and recording outputs.
+
+    Two very different jobs, deliberately kept apart:
+
+    - A deprecated ID is *renamed* on an ordinary run. jim_nvenc and
+      obs_nvenc_h264_tex are the same encoder with the same settings; OBS maps
+      one to the other and logs a deprecation warning per output per launch. So
+      this is a repair, in the same spirit as fixing a stale browser URL.
+
+    - Switching encoder -- x264 to NVENC, say -- is never done unasked, because
+      x264 can be a deliberate choice (a second PC, a recording you want CPU
+      quality for) and this script does not overwrite deliberate choices. It
+      warns, and `--encoder auto` performs it. The README's new-machine
+      walkthrough calls that flag out, which is what makes a fresh install end
+      up on the GPU without anybody clicking through Settings -> Output.
+    """
+    mode = obs.req("GetProfileParameter",
+                   {"parameterCategory": "Output",
+                    "parameterName": "Mode"}).get("parameterValue")
+    simple = (mode or "Simple").lower() != "advanced"
+    cat, stream_key, rec_key = ENCODER_KEYS[simple]
+
+    have = available_encoders()
+    want = None
+    if a.encoder == "auto":
+        if not have:
+            plan.warn(
+                "--encoder auto could not read an encoder list out of OBS's "
+                "log, so it cannot tell what this machine has and has changed "
+                "nothing. Pick one: --encoder nvenc / qsv / amd / apple / x264."
+            )
+            return
+        want = next((e for e in HW_PREFERENCE if e in have), None)
+    elif a.encoder:
+        want = ENCODER_CHOICES[a.encoder]
+        if have and want not in have:
+            plan.warn(
+                "--encoder %s asks for %s, which this OBS did not register. It "
+                "has: %s. Nothing changed."
+                % (a.encoder, want, ", ".join(sorted(have)))
+            )
+            return
+
+    touched = False
+    for label, key in (("stream", stream_key), ("recording", rec_key)):
+        raw = obs.req("GetProfileParameter",
+                      {"parameterCategory": cat,
+                       "parameterName": key}).get("parameterValue")
+        # Whatever is there now, as a modern ID. With no --encoder that is also
+        # the target: the only change an ordinary run makes is spelling.
+        cur = resolve_encoder(raw, simple)
+        target = want or cur
+        written = SIMPLE_TOKEN.get(target, target) if simple else target
+
+        # An unset key is OBS's default, which resolve_encoder already reports
+        # as obs_x264. Writing that default back would be noise.
+        if written != raw and (raw or want):
+            touched = True
+            plan.do(
+                "%s encoder: %s -> %s%s"
+                % (label, raw or "(OBS default)", written,
+                   "" if want else "   deprecated ID, same encoder"),
+                lambda c=cat, k=key, v=written: obs.req(
+                    "SetProfileParameter",
+                    {"parameterCategory": c, "parameterName": k,
+                     "parameterValue": v}),
+            )
+
+        # Only when nothing was asked for. If you passed --encoder x264 you do
+        # not need to be told there is a GPU in the machine.
+        if not a.encoder and cur in SOFTWARE_ENCODERS and have:
+            better = next((e for e in HW_PREFERENCE
+                           if e in have and e not in SOFTWARE_ENCODERS), None)
+            if better:
+                plan.warn(
+                    "%s output is on %s, a software encoder, but this machine "
+                    "registered %s. The pan is a 7680x4320 CSS transform inside "
+                    "CEF and Source Record adds an output per source -- the CPU "
+                    "has enough to do. `--encoder auto` switches it."
+                    % (label, cur, better)
+                )
+
+    if touched and not a.check:
+        plan.warn(
+            "OBS reads the encoder when an output starts, so this takes effect "
+            "on your next Start Streaming / Start Recording. Settings -> Output "
+            "may keep showing the old value until you reopen it, and the profile "
+            "is written to disk when OBS quits cleanly."
+        )
 
 
 def preflight(plan: Plan) -> None:
@@ -768,7 +1368,8 @@ def preflight(plan: Plan) -> None:
         sock.close()
 
     for rel in ("mascot/mascot.html", "mascot/placement.json",
-                "mascot/deer/manifest.json", "overlay.html"):
+                "mascot/placement-vertical.json",
+                "mascot/deer/manifest.json", "overlay.html", "vertical.html"):
         if not (REPO / rel).exists():
             plan.warn("%s is missing from the repo" % rel)
 

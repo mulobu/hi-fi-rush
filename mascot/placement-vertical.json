@@ -1,0 +1,41 @@
+{
+  "_comment": [
+    "Vertical twin of placement.json. Same format, same meaning -- the only",
+    "difference is the canvas it measures against: x and y are pixels in the",
+    "1080x1920 vertical canvas, not the 1920x1080 main one.",
+    "",
+    "Loaded by the DeerV browser source in VCOMIC:",
+    "  http://127.0.0.1:4460/mascot.html?set=deer&place=placement-vertical.json",
+    "mascot.html needed no changes for this -- it already takes `place`, and it",
+    "derives every bound from innerWidth/innerHeight rather than assuming 16:9.",
+    "",
+    "x,y is the PIVOT: the point the gaze rotates about, sitting `pivot` of the",
+    "way down the cell (0.30 = roughly the head). Not the cell's top-left, and",
+    "not its centre.",
+    "",
+    "Scenes named here are the same three the horizontal mascot appears on, so",
+    "the two pages stay consistent. A scene with no entry hides the mascot.",
+    "Spots were measured off the built page in canvas pixels, not eyeballed:",
+    "",
+    "  GAME  panel fills the frame exactly. The Game window bottoms out at 692",
+    "        and the Cam window at 1214; the scrawl ends at 1367 and the tag",
+    "        starts at 1851. That leaves a clear band on the right below the",
+    "        webcam, which is where this sits -- cell 1370..1750, clear of both.",
+    "  BRB   lands inside .mascot-frame, measured at 171,773,636,622. Centred in",
+    "        it: a 460 cell in a 622-tall frame. Drawn art, never a hole, so the",
+    "        mascot's own alpha reads against comic rather than live video.",
+    "  CHAT  the tightest of the three. The portrait panel leaves only a 218px",
+    "        gutter on the right, so this one is small and deliberately clips",
+    "        the panel edge. It is the first to drop if it reads badly.",
+    "",
+    "Re-author by dragging, same as the horizontal file:",
+    "  http://127.0.0.1:4460/mascot.html?set=deer&place=placement-vertical.json&edit=1",
+    "in OBS via right-click -> Interact, then paste the JSON it prints."
+  ],
+
+  "scenes": {
+    "GAME": { "x": 800, "y": 1484, "size": 380, "pivot": 0.3 },
+    "BRB": { "x": 489, "y": 992, "size": 460, "pivot": 0.3 },
+    "CHAT": { "x": 950, "y": 1400, "size": 250, "pivot": 0.3 }
+  }
+}

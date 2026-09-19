@@ -30,6 +30,19 @@
         --canvas-h: 1080px;
         --page-w: 7680px;
         --page-h: 4320px;
+        /* How far the gutter overhangs the page. It must exceed the worst
+           bleed DURING a pan, not at rest. Resting worst is chat at 1672 page
+           px, which is what the old 2000 was sized for, and it was wrong: a
+           transition interpolates the transform components independently, so
+           the camera passes through views wider than either endpoint, and the
+           overshoot easing carries it ~4.8% past the target on top of that.
+           Stepping every ordered pair through the real easing peaks at
+           cam -> chat, 2187 page px at 550ms in — 187 past the old skirt, a
+           54px band of bare canvas along the frame edge on every switch into
+           CHAT. 2500 clears every pan; 3000 is headroom, and a whole number
+           of 30px halftone tiles so the skirt's dots stay in phase with the
+           page's. */
+        --page-skirt: 3000px;
 
         --beat-ms: 500ms;
         --pan-ms: 980ms;
@@ -114,13 +127,64 @@
            every panel, tag and border as well. .page-under carries the paint
            instead, as a sibling of the panels rather than their ancestor. */
       }
-      /* Gutter and halftone. Overhangs the page by the skirt so a fitted panel
-         that shows past the page edge shows gutter, not webcam. */
-      .page-under {
+      /* Gutter and halftone, in five elements that look like one surface.
+
+         .page-under is the page itself and carries the cuts. The skirt — the
+         overhang that makes a fitted panel show gutter past the page edge
+         rather than webcam — is four bands AROUND that rectangle: top, bottom,
+         left, right. They meet its edges and never lie over it.
+
+         The band that must not exist is a single inset rectangle. It would
+         cover the page as well as the overhang, and being unmasked it would
+         seal every cut in .page-under back up: no video, anywhere. The reason
+         to split at all is that only the page can contain a cut, so only the
+         page needs a mask — and a mask forces its own composited layer, so
+         one inset element would have put 13680 x 10320, 4x the page's area,
+         through the compositor on every frame of a pan.
+
+         Phase: the halftone tiles at 30px, and the page (7680 x 4320) and the
+         skirt (3000) are all whole numbers of tiles, so every band's origin
+         lands on the same grid as the page's and the seams are invisible. */
+      .skirt-n,
+      .skirt-s,
+      .skirt-w,
+      .skirt-e {
         position: absolute;
-        inset: -2000px;
         background: var(--gutter);
       }
+      .skirt-n,
+      .skirt-s {
+        left: calc(-1 * var(--page-skirt));
+        right: calc(-1 * var(--page-skirt));
+        height: var(--page-skirt);
+      }
+      .skirt-n {
+        top: calc(-1 * var(--page-skirt));
+      }
+      .skirt-s {
+        top: 100%;
+      }
+      .skirt-w,
+      .skirt-e {
+        top: 0;
+        height: var(--page-h);
+        width: var(--page-skirt);
+      }
+      .skirt-w {
+        left: calc(-1 * var(--page-skirt));
+      }
+      .skirt-e {
+        left: 100%;
+      }
+      .page-under {
+        position: absolute;
+        inset: 0;
+        background: var(--gutter);
+      }
+      .skirt-n::before,
+      .skirt-s::before,
+      .skirt-w::before,
+      .skirt-e::before,
       .page-under::before {
         content: "";
         position: absolute;
@@ -766,14 +830,19 @@
           rot: -1.0,
           tag: "STREAM START",
           holes: [
+            /* 38 × 42.8 of 2360 × 1180 is 897 × 505 — 16:9 to within a pixel,
+               so fillTransform crops almost nothing off the webcam. The square
+               window that used to sit here held the standby loop, which was
+               dropped: a starting-soon screen wants your face, and a second
+               video source existed only to fill this one hole. */
             {
-              src: "Standby",
-              x: 60,
-              y: 14,
-              w: 35,
-              h: 70,
-              label: "Standby loop",
-              c: "#3a2a5c",
+              src: "Cam",
+              x: 58,
+              y: 28,
+              w: 38,
+              h: 42.8,
+              label: "Webcam",
+              c: "#4a3a1e",
             },
           ],
         },
@@ -1021,6 +1090,12 @@
         panelEls = {},
         holeEls = [];
 
+      ["skirt-n", "skirt-s", "skirt-w", "skirt-e"].forEach((c) => {
+        const b = document.createElement("div");
+        b.className = c;
+        pageEl.appendChild(b);
+      });
+
       const pageUnder = document.createElement("div");
       pageUnder.className = "page-under";
       pageEl.appendChild(pageUnder);
@@ -1092,11 +1167,6 @@
         el.style.background = "none";
       });
 
-      /* Matches .page-under inset. Must exceed the worst fitted bleed:
-         chat sits at scale 0.33 and shows 1612 page px past the page edge.
-         Undersize it and that band goes transparent — black, or whatever
-         source overspill happens to land there. */
-      const PAGE_SKIRT = 2000;
       const PANEL_BORDER = 15; /* matches .panel border-width */
 
       /* Page-space geometry per hole, from the same config the DOM is built
@@ -1159,6 +1229,7 @@
       const pendingReq = new Map();
       const itemIds = new Map(); /* sourceName -> sceneItemId */
       const srcSize = new Map(); /* sourceName -> {w, h} in source pixels */
+      const itemOn = new Map(); /* sourceName -> enabled, as OBS last reported */
       const managed = new Set(holeEls.map((h) => h.src));
 
       /* ================================================================
@@ -1224,9 +1295,9 @@
           webkitMaskPosition: `${X}px ${Y}px`,
           maskRepeat: "no-repeat",
           webkitMaskRepeat: "no-repeat",
-          /* Without this the mask paints only within the element's border box
-             and eats .page's gutter skirt, so a fitted panel shows webcam
-             past the page edge instead of gutter. */
+          /* mask-clip defaults to border-box. Every mask here is authored in
+             its element's own box so the default would do, but a cut whose
+             rounding lands a hair outside would be clipped away silently. */
           maskClip: "no-clip",
           webkitMaskClip: "no-clip",
         });
@@ -1349,29 +1420,23 @@
               0,
               0,
             );
-            /* same hole in .page-under's box, which starts one skirt above
-               and left of the page origin */
+            /* Same hole in .page-under's box, which is the page itself —
+               the skirt is a separate, unmasked element, so page-space
+               coordinates go straight in. */
             pageCuts += quad(
-              h.pageInner.x + PAGE_SKIRT,
-              h.pageInner.y + PAGE_SKIRT,
+              h.pageInner.x,
+              h.pageInner.y,
               h.pageInner.w,
               h.pageInner.h,
-              h.cx + PAGE_SKIRT,
-              h.cy + PAGE_SKIRT,
+              h.cx,
+              h.cy,
               h.rot,
             );
           });
           applyMask(under, 0, 0, mine[0].panelW, mine[0].panelH, panelCuts);
         });
 
-        applyMask(
-          pageUnder,
-          0,
-          0,
-          PAGE_W + 2 * PAGE_SKIRT,
-          PAGE_H + 2 * PAGE_SKIRT,
-          pageCuts,
-        );
+        applyMask(pageUnder, 0, 0, PAGE_W, PAGE_H, pageCuts);
         syncVisibility();
       }
       applyPunch(-1); /* nothing live yet — page fully opaque */
@@ -1493,7 +1558,11 @@
          frozen at whatever half-way rect it had reached. */
       function startTracking(ms) {
         trackUntil = Math.max(trackUntil, performance.now() + ms);
-        if (!trackRAF) trackRAF = requestAnimationFrame(track);
+        /* Pushed this frame, not the next. applyPunch has already cut the new
+           holes, so waiting a frame leaves each newly punched hole showing
+           whatever is behind it — since unused sources park off-canvas, that
+           is bare canvas. track() schedules its own successor. */
+        if (!trackRAF) track();
       }
 
       /* ================================================================
@@ -1754,8 +1823,10 @@
         request("GetSceneItemList", { sceneName: HOST_SCENE })
           .then((r) => {
             itemIds.clear();
+            itemOn.clear();
             r.sceneItems.forEach((i) => {
               itemIds.set(i.sourceName, i.sceneItemId);
+              itemOn.set(i.sourceName, i.sceneItemEnabled !== false);
               /* Source pixel size, needed to compute the fill crop below. A
                  source that has not produced a frame yet reports 0 — left out
                  so pushRects falls back until it has. */
@@ -1819,6 +1890,10 @@
            the opening; it just spills until the size is known. */
         if (!s) {
           t.boundsType = "OBS_BOUNDS_SCALE_OUTER";
+          /* A crop left over from the last time this source DID have a size
+             would still apply, and SCALE_OUTER would fit the cropped frame —
+             zoomed in on a slice of it. */
+          t.cropLeft = t.cropRight = t.cropTop = t.cropBottom = 0;
           return t;
         }
 
@@ -1858,24 +1933,62 @@
         if (reqs.length) sendBatch(reqs);
       }
 
-      /* Sources the live panel does not use are switched off, so nothing can
-         peek through a hole it does not belong to. Only sources this overlay
-         actually owns are touched — anything else in COMIC, Overlay included,
-         is left alone. */
+      /* Sources the live panel does not use are parked wholly outside the
+         canvas, not switched off.
+
+         Disabling the item deactivates the source, and reactivating it is not
+         free: a game capture has to re-hook its target and a capture device
+         has to reopen the device, which is anywhere from a few hundred ms to
+         a couple of seconds of black the next time that hole is punched.
+         CHAT is the only view that drops Game — its camera starts past
+         x=3490 and the game panel ends at 3464 — so every switch out of chat
+         paid for a re-hook. CAM drops it too. That is the black leaving chat;
+         the skirt above is the black arriving.
+
+         Parked items stay hooked, keep feeding Source Record, and still
+         cannot show through a hole they do not own: top-left alignment at
+         canvas + 200 puts every pixel off-canvas. Enable is only sent for an
+         item actually seen disabled, so a source switched off by hand comes
+         back once instead of being fought over on every pan. Only sources
+         this overlay owns are touched — anything else in COMIC, Overlay
+         included, is left alone. */
+      const PARK = {
+        positionX: CANVAS_W + 200,
+        positionY: CANVAS_H + 200,
+        alignment: 5,
+        rotation: 0,
+        boundsType: "OBS_BOUNDS_STRETCH",
+        boundsAlignment: 0,
+        boundsWidth: 16,
+        boundsHeight: 9,
+      };
+
       function syncVisibility() {
         if (!wsReady || !itemIds.size) return;
         const used = new Set([...punched].map((h) => h.src));
         const reqs = [];
         itemIds.forEach((id, name) => {
           if (!managed.has(name)) return;
-          reqs.push({
-            requestType: "SetSceneItemEnabled",
-            requestData: {
-              sceneName: HOST_SCENE,
-              sceneItemId: id,
-              sceneItemEnabled: used.has(name),
-            },
-          });
+          if (itemOn.get(name) === false) {
+            reqs.push({
+              requestType: "SetSceneItemEnabled",
+              requestData: {
+                sceneName: HOST_SCENE,
+                sceneItemId: id,
+                sceneItemEnabled: true,
+              },
+            });
+            itemOn.set(name, true);
+          }
+          if (!used.has(name))
+            reqs.push({
+              requestType: "SetSceneItemTransform",
+              requestData: {
+                sceneName: HOST_SCENE,
+                sceneItemId: id,
+                sceneItemTransform: PARK,
+              },
+            });
         });
         if (reqs.length) sendBatch(reqs);
       }
