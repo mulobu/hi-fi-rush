@@ -1,0 +1,71 @@
+<!doctype html>
+<!--
+  Tts -- plays chat lines that chat-bridge.py synthesises with Piper.
+
+  Loaded by the `Tts` browser source in COMIC. It draws nothing; it exists
+  because a browser source is the one place audio enters OBS on its own fader,
+  with "Control audio via OBS" routing it into the mix. OBS's own
+  speechSynthesis cannot do this job -- in CEF it lists voices and never
+  speaks (CLAUDE.md, "Chat TTS").
+
+  file://, not served by the bridge, for the reason overlay.html is: a
+  browser source never retries a page that failed to load, so a page served
+  by a bridge that was not up yet stays blank until someone refreshes it --
+  measured, the first time Tts was created. Loaded from disk it always
+  boots, and only the event stream needs the bridge, which EventSource
+  retries by itself. Start order stops mattering.
+
+  The bridge announces each line over /events; this page fetches the WAV,
+  plays it, and POSTs /done/<n> when it ends or fails. The bridge waits on
+  that before sending the next, so lines never overlap.
+
+  ?debug=1 shows what it is doing. ?bridge=http://host:port overrides where
+  the bridge is.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Tts</title>
+<style>
+  html, body { margin: 0; background: transparent; overflow: hidden; }
+  #debug { display: none; font: 13px/1.4 system-ui, sans-serif; color: #16161d;
+           background: #f4f1e8; padding: 8px 10px; white-space: pre; }
+  .on #debug { display: block; }
+</style>
+</head>
+<body>
+<div id="debug">connecting…</div>
+<script>
+  "use strict";
+  const params = new URLSearchParams(location.search);
+  // Served by the bridge itself (for a quick look in a browser) the origin is
+  // already right; from file:// it has to be named. Must match TTS_PORT.
+  const BRIDGE = params.get("bridge") ||
+    (location.protocol === "file:" ? "http://127.0.0.1:4461" : "");
+  const debug = params.has("debug");
+  const out = document.getElementById("debug");
+  if (debug) document.body.classList.add("on");
+  const say = (msg) => { if (debug) out.textContent = msg; };
+
+  const events = new EventSource(BRIDGE + "/events");
+  events.onopen = () => say("connected to " + (BRIDGE || location.host) + ", waiting for chat");
+  events.onerror = () => say("bridge not reachable, retrying…");
+
+  events.onmessage = (e) => {
+    const { n } = JSON.parse(e.data);
+    const clip = new Audio(BRIDGE + "/line/" + n + ".wav");
+    let reported = false;
+    const done = (how) => {
+      if (reported) return;
+      reported = true;
+      say("line " + n + " " + how);
+      fetch(BRIDGE + "/done/" + n, { method: "POST" }).catch(() => {});
+    };
+    clip.onended = () => done("finished");
+    clip.onerror = () => done("failed to load");
+    say("line " + n + " playing");
+    clip.play().catch(() => done("refused to play"));
+  };
+</script>
+</body>
+</html>

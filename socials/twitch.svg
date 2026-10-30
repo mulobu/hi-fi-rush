@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+  <defs><filter id="lift" x="-10%" y="-10%" width="130%" height="130%"><feOffset in="SourceAlpha" dx="3.5" dy="3.5" result="o"/><feFlood flood-color="#16161d" flood-opacity=".38"/><feComposite in2="o" operator="in" result="s"/><feMerge><feMergeNode in="s"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+  <polygon points="14,10 45,14 76,8 109,13 106,42 112,71 105,108 74,112 43,107 12,112 15,80 8,49" fill="#f4f1e8" stroke="#16161d" stroke-width="3" stroke-linejoin="round"/>
+  <g filter="url(#lift)" transform="rotate(3 60 60) translate(23 22) scale(3.1)">
+    <!-- Glitch mark, simple-icons (CC0). Backed in white so the shadow falls from the silhouette, not into it. -->
+    <path fill="#ffffff" d="M6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0z"/>
+    <path fill="#9146ff" d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714Z"/>
+  </g>
+  <rect x="2" y="96" width="38" height="13" fill="#f4f1e8" fill-opacity=".72" stroke="#16161d" stroke-opacity=".35" stroke-width="1.5" transform="rotate(38 21 102)"/>
+</svg>

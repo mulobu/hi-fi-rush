@@ -344,6 +344,101 @@
         pointer-events: none;
       }
 
+      /* SOCIALS — paper cut-outs taped to every scene panel.
+
+         Sized in CANVAS px through --u, which the build sets to 1 / the
+         panel's resting scale. Panels land anywhere from 0.33x (chat) to
+         1.17x (cam) on the horizontal page, so page-px sizes would make the handle 3.5x bigger on
+         one scene than another. Always lifted `over`: on game the whole panel
+         is a hole, and under-art there would be painted over by the capture. */
+      .socials {
+        position: absolute;
+        z-index: 7;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: calc(var(--u) * 8px);
+        pointer-events: none;
+      }
+      .socials.row {
+        flex-direction: row;
+        align-items: center;
+        gap: calc(var(--u) * 26px);
+      }
+      /* Two lines: the first two labels side by side, the third under them. */
+      .soc-line {
+        display: flex;
+        align-items: center;
+        gap: calc(var(--u) * 26px);
+      }
+      .soc-row {
+        display: flex;
+        align-items: center;
+      }
+      .socials .cut {
+        width: calc(var(--u) * 82px);
+        height: calc(var(--u) * 82px);
+        margin-right: calc(var(--u) * -10px);
+        filter: drop-shadow(
+          calc(var(--u) * 5px) calc(var(--u) * 5px) 0 rgba(22, 22, 29, 0.55)
+        );
+        transform: rotate(var(--r, 0deg));
+        animation: cutBob calc(var(--beat-ms) * 2) var(--snap) infinite;
+      }
+      .socials .cut:nth-child(1) {
+        --r: -6deg;
+      }
+      .socials .cut:nth-child(2) {
+        --r: 4deg;
+        animation-delay: calc(var(--beat-ms) * -1.5);
+      }
+      .socials .cut:nth-child(3) {
+        --r: -3deg;
+        animation-delay: calc(var(--beat-ms) * -1);
+      }
+      @keyframes cutBob {
+        0% {
+          transform: rotate(var(--r, 0deg)) scale(1.1);
+        }
+        30%,
+        100% {
+          transform: rotate(var(--r, 0deg)) scale(1);
+        }
+      }
+      /* Over live video nothing animates (§2) — the game panel is all hole. */
+      .p-game .socials .cut {
+        animation: none;
+      }
+      /* drop-shadow on the wrapper, because clip-path on the label clips
+         any shadow the label casts itself. */
+      .handle {
+        margin-left: calc(var(--u) * 16px);
+        filter: drop-shadow(
+          calc(var(--u) * 5px) calc(var(--u) * 5px) 0 rgba(22, 22, 29, 0.55)
+        );
+      }
+      .handle span {
+        display: block;
+        background: var(--paper);
+        color: var(--ink);
+        font-family: var(--f-body);
+        font-weight: 800;
+        font-size: calc(var(--u) * 34px);
+        line-height: 1;
+        padding: calc(var(--u) * 12px) calc(var(--u) * 20px)
+          calc(var(--u) * 7px);
+        white-space: nowrap;
+        transform: rotate(-2deg);
+        /* Scissor-cut, not torn: straight facets at odd angles. */
+        clip-path: polygon(
+          0 8%, 22% 0, 51% 6%, 78% 0, 100% 5%,
+          98% 52%, 100% 94%, 70% 100%, 38% 95%, 9% 100%, 1% 90%, 2% 48%
+        );
+      }
+      .soc-row + .soc-row .handle span {
+        transform: rotate(1.5deg);
+      }
+
       /* ============================================================
    PANEL 1 — STREAM START   2072 x 2200
    Art above the webcam window, clock below it.
@@ -375,7 +470,7 @@
         letter-spacing: 0.06em;
       }
       .p-start .scrawl {
-        right: 6%;
+        right: 14%;
         top: 8%;
         font-size: 105px;
         transform: rotate(-4deg);
@@ -384,24 +479,98 @@
       /* ============================================================
    PANEL 3 — GAMEPLAY   1800 x 3200, exactly 9:16
    Game window on top, cam under it, art and tag in the third below.
+
+   Background is navy, NOT --ink as on the horizontal page. There the
+   Game hole is `bare` at 100% x 100%, so the panel background never
+   renders a pixel and its colour is arbitrary. Here the two windows
+   cover 50.3% of the panel and the other half IS the page — ink made
+   that half a black slab with a scrawl in it. §4: flat saturated
+   colour with a halftone grid over the top, like every other panel.
    ============================================================ */
       .p-game {
-        background: var(--ink);
+        background: var(--navy);
       }
+      /* Static burst behind the windows. The shared .rays spins, which drags
+         the eye off the windows it sits under; same conic gradient, origin at
+         50% 43.5% so the vanishing point lands at canvas y764, in the 28px
+         gap between cam and game, rather than inside either of them. The
+         element is inset -30%, so that fraction is of 3043px, not of 1920. */
+      .p-game .burst {
+        position: absolute;
+        inset: -30%;
+        pointer-events: none;
+        background: repeating-conic-gradient(
+          from 0deg at 50% 43.5%,
+          rgba(255, 255, 255, 0.14) 0deg 3deg,
+          transparent 3deg 10deg
+        );
+      }
+      /* Cyan on navy is legible but flat. The inked slab with a hard offset
+         shadow is the panel-tag language the rest of the page speaks.
+
+         Sized to fit the 60 canvas px between SAFE_TOP and the cam window:
+         canvas 146-188. It used to be 84px at top 1.2%, which landed at
+         canvas 31 — 109px above the safe line, inside the notch on every
+         platform. */
       .p-game .strip {
         position: absolute;
         left: 4%;
-        top: 1.5%;
+        top: 7.2%;
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        background: var(--ink);
+        padding: 8px 24px 5px;
         font-family: var(--f-display);
-        font-size: 84px;
+        font-size: 56px;
         letter-spacing: 0.1em;
         color: var(--cyan);
+        transform: rotate(-0.8deg);
+        box-shadow: 9px 9px 0 rgba(22, 22, 29, 0.55);
       }
-      .p-game .scrawl {
-        left: 6%;
-        top: 66%;
-        font-size: 118px;
-        transform: rotate(-3deg);
+      .p-game .strip::before {
+        content: "";
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: var(--marker);
+        animation: livePip var(--beat-ms) var(--snap) infinite;
+      }
+      @keyframes livePip {
+        0% {
+          transform: scale(1.35);
+          opacity: 1;
+        }
+        55%,
+        100% {
+          transform: scale(1);
+          opacity: 0.55;
+        }
+      }
+      /* The band under the cam window, which was the worst of the black.
+         Chevrons running on the beat — the page's own motion language, and
+         a drawn edge that stops the lower third reading as void. Deliberately
+         light: §8's vertical real-estate proposal wants this band. */
+      .p-game .chevrons {
+        position: absolute;
+        left: -4%;
+        right: -4%;
+        top: 70.61%;
+        height: 80px;
+        border-top: 11px solid var(--ink);
+        border-bottom: 11px solid var(--ink);
+        transform: rotate(-1.1deg);
+        background-image: repeating-linear-gradient(
+          -62deg,
+          var(--yellow) 0 54px,
+          var(--ink) 54px 108px
+        );
+        animation: chevronRun calc(var(--beat-ms) * 2) linear infinite;
+      }
+      @keyframes chevronRun {
+        to {
+          background-position: 216px 0;
+        }
       }
 
       /* ============================================================
@@ -487,7 +656,7 @@
         transform: rotate(-1.4deg);
       }
       .p-end .rank {
-        right: 8%;
+        right: 15%;
         top: 3%;
         width: 250px;
         height: 250px;
@@ -497,7 +666,7 @@
       .credits {
         position: absolute;
         left: 5%;
-        bottom: 8%;
+        bottom: 9.5%;
         width: 68%;
         height: 26%;
         overflow: hidden;
@@ -546,7 +715,7 @@
       }
       .p-chat .header {
         position: absolute;
-        top: 26px;
+        top: 188px;
         left: 26px;
         right: 26px;
         background: var(--ink);
@@ -767,6 +936,20 @@
         CANVAS_W = 1080,
         CANVAS_H = 1920;
 
+      /* Platform chrome, in canvas px. The union of TikTok's 140 / 324 / 164
+         and YouTube Shorts' 120 / 300 / 96 — the vertical output goes to both
+         through Restream, which fans one 1080 x 1920 encode out unchanged, so
+         the strictest of the two governs every platform.
+
+         A picture may run under the right rail; the action is centred and a
+         covered corner of game capture costs nothing. Type may not. So the
+         windows keep their full 977px width and only TEXT is held inside
+         SAFE_RIGHT. SAFE_PAD is slack against a device with a taller notch. */
+      const SAFE_TOP = 140,
+        SAFE_BOTTOM = 324,
+        SAFE_RIGHT = 164,
+        SAFE_PAD = 12;
+
       const params = new URLSearchParams(location.search);
       const DEBUG = params.has("debug");
 
@@ -793,6 +976,8 @@
           h: 2200,
           rot: 0.9,
           tag: "STREAM START",
+          /* Right of the countdown, text held inside SAFE_RIGHT. */
+          socials: { at: "right:16%;top:78%", size: 0.8 },
           holes: [
             /* 84% of 2042 is 1715px; 44.46% of 2170 is 965px — 16:9 to within
                a pixel. Sits mid-panel so the type clears it above and the
@@ -820,6 +1005,11 @@
           h: 3200,
           rot: -1.1,
           tag: "CHAT",
+          /* Over the top of the chat window. The portrait panel fills the
+             frame and the band under the window belongs to the tag, so there
+             is no free page here — the top of the log is the oldest messages,
+             the cheapest pixels on the panel. */
+          socials: { at: "left:7%;top:13%", size: 0.75 },
           holes: [
             /* Chat is a portrait widget in a portrait panel, so this one is
                deliberately NOT 16:9 — cropping a chat log to 16:9 would throw
@@ -827,9 +1017,9 @@
             {
               src: "Chat",
               x: 5,
-              y: 10,
+              y: 11.6,
               w: 90,
-              h: 82,
+              h: 72.6,
               label: "Chat browser",
               c: "#243a2e",
             },
@@ -847,34 +1037,55 @@
           h: 3200,
           rot: 0.5,
           tag: "GAMEPLAY",
-          speedlines: true,
+          /* In the info band, in the slot the scrawl had — left of the mascot
+             (canvas x 610+), above the tag. */
+          socials: { at: "left:4%;top:74.2%", layout: "pair", size: 0.65 },
+          /* No speedlines here, unlike the horizontal game panel. .speedlines
+             is 1deg of ink every 3.4deg AND it spins; the static .burst is
+             3deg of white every 10deg. Run both and the two conic gradients
+             beat against each other, and every phone views this canvas
+             downscaled, which resolves the moire into a flat grey wash that
+             reads as a broken panel. The horizontal page never hits it: its
+             game hole is the whole panel, so no speedline is ever visible. */
           holes: [
             /* 1800 x 3200 is exactly 9:16, so `fill` renders 1080 x 1920 with
                zero crop and zero bleed — the only panel that clears §5's ~5%
-               rule. Both windows are 16:9 against the 1770 x 3170 content
-               box: 92% -> 1628 x 916, 68% -> 1204 x 677.
+               rule. Both windows are 92% of the 1770 x 3170 content box and
+               16:9 against it: 1628 x 916 page px, 977 x 550 on canvas.
+
+               CAM IS FIRST, AND THAT IS THE POINT. The windows used to run
+               game-then-cam, with the cam narrower at 68%. Measured against
+               the platform margins that put gameplay alone at 26% of frame,
+               under the 40-50% every source gives for the primary zone, and
+               put the face in the dead middle where mobile eyes do not go.
+               Face top, game middle, engagement bottom is the composition the
+               research converges on; equal-width stacked windows also read as
+               two comic panels rather than one window and one inset.
+
+               Canvas landings: cam 200-750, game 778-1328. Both clear
+               SAFE_TOP and leave 1352-1596 for the band below. Coverage 52%.
 
                Neither is `bare`. On the horizontal page the game hole is the
                whole panel and has to be; here they sit stacked with art below,
-               so both keep inked borders — and being side by side rather than
+               so both keep inked borders — and being stacked rather than
                nested, mergeCuts has no containment case to resolve. */
+            {
+              src: "Cam",
+              x: 4,
+              y: 10.04,
+              w: 92,
+              h: 28.9,
+              label: "Webcam",
+              c: "#4a3a1e",
+            },
             {
               src: "Game",
               x: 4,
-              y: 7,
+              y: 40.43,
               w: 92,
               h: 28.9,
               label: "Game capture",
               c: "#1e3a2e",
-            },
-            {
-              src: "Cam",
-              x: 16,
-              y: 42,
-              w: 68,
-              h: 21.36,
-              label: "Webcam",
-              c: "#4a3a1e",
             },
           ],
         },
@@ -890,6 +1101,8 @@
           h: 1576,
           rot: 1.3,
           tag: "CAM",
+          /* Under the webcam window. */
+          socials: { at: "left:6%;top:62%" },
           holes: [
             /* 88% of 1162 is 1023px; 37.2% of 1546 is 575px — 16:9. */
             {
@@ -915,6 +1128,8 @@
           h: 2056,
           rot: 1.1,
           tag: "BRB",
+          /* Between BE RIGHT BACK and the mascot frame, left of the bubble. */
+          socials: { at: "left:6%;top:24%", size: 0.8 },
           /* No holes. The mascot frame is drawn art, and leaving Cam unclaimed
              here lets the game panel bleeding into frame keep the webcam. */
           holes: [],
@@ -931,6 +1146,9 @@
           h: 2056,
           rot: -0.6,
           tag: "STREAM END",
+          /* Under MISSION COMPLETE, above the webcam — the credits roll owns
+             the space below it. */
+          socials: { at: "left:8%;top:16.3%", size: 0.75 },
           holes: [
             /* 84% of 1335 is 1121px; 31.1% of 2026 is 630px — 16:9. */
             {
@@ -988,6 +1206,41 @@
         },
       ];
 
+      /* Platforms that share a handle share a label. */
+      const SOCIALS = [
+        { handle: "thedeepeffect", on: ["kick"] },
+        { handle: "thedeepeffect_", on: ["twitch", "youtube"] },
+        { handle: "@thedeepeffect__", on: ["instagram"] },
+      ];
+      const SOCIAL_NAMES = {
+        kick: "Kick",
+        twitch: "Twitch",
+        youtube: "YouTube",
+        instagram: "Instagram",
+      };
+
+      function socialsFor(p, cls, style) {
+        const s = p.socials,
+          u = (s.size || 1) / scaleFor(p);
+        return (
+          `<div class="socials ${s.layout || "stack"} ${cls}" style="--u:${u.toFixed(4)};${style}">` +
+          SOCIALS.map(
+            (g, i) =>
+              (s.layout === "pair" && i === 0 ? `<div class="soc-line">` : "") +
+              `<div class="soc-row">` +
+              g.on
+                .map(
+                  (n) =>
+                    `<img class="cut" src="socials/${n}.svg" alt="${SOCIAL_NAMES[n]}">`,
+                )
+                .join("") +
+              `<span class="handle"><span>${g.handle}</span></span></div>` +
+              (s.layout === "pair" && i === 1 ? `</div>` : ""),
+          ).join("") +
+          `</div>`
+        );
+      }
+
       /* ================================================================
    PANEL ART
    ================================================================ */
@@ -1003,8 +1256,9 @@
             return `<div class="header">CHAT</div>`;
           case "game":
             return `
+      <div class="burst"></div>
       <div class="strip">LIVE</div>
-      <div class="scrawl">no deaths. probably.</div>`;
+      <div class="chevrons"></div>`;
           case "cam":
             return `<div class="rays"></div>`;
           case "brb":
@@ -1099,8 +1353,10 @@
         /* Order is the whole trick: .under is masked, everything after it is
            not. Holes keep their inked borders, and speedlines and tag stay on
            top of the video. */
+        const panelSocials =
+          p.socials && !p.socials.page ? socialsFor(p, "over", p.socials.at) : "";
         el.innerHTML =
-          `<div class="under">${artFor(p)}` +
+          `<div class="under">${artFor(p)}${panelSocials}` +
           (p.speedlines ? '<div class="speedlines"></div>' : "") +
           `</div>` +
           holesHTML +
@@ -1110,6 +1366,16 @@
 
         pageEl.appendChild(el);
         panelEls[p.id] = el;
+        /* Gutter-placed socials ride the page, outside every mask. */
+        if (p.socials && p.socials.page)
+          pageEl.insertAdjacentHTML(
+            "beforeend",
+            socialsFor(
+              p,
+              "",
+              `left:${p.socials.page.x}px;top:${p.socials.page.y}px`,
+            ),
+          );
         (p.holes || []).forEach((h, i) =>
           holeEls.push({
             src: h.src,
@@ -1180,6 +1446,55 @@
         });
       })();
 
+      /* ================================================================
+   SAFE-ZONE PASS — measured off the built page, not modelled.
+
+   §4's signature element is the panel tag, and it sat below the platform
+   caption bar on five of six vertical scenes: game +297 canvas px, chat
+   +269, end +119, brb +118, cam +17. The tag is authored once, in panel
+   coordinates, at bottom: 32px — but every panel lands at its own fit
+   scale, so no single number clears the line on all six, and six
+   hand-tuned numbers rot the first time a panel moves.
+
+   So it is read back off the page the way the punch sets are: apply each
+   panel's resting transform, measure that panel's own tag, and raise it
+   by exactly the overflow converted back into page px. The scale comes
+   from scaleFor(), never from the measured rect — every panel is tilted,
+   and a rotated AABB is taller than the box it encloses.
+
+   Runs on document.fonts.ready: a Bangers tag measured against the
+   fallback stack is the wrong height. Touches nothing the pan or the
+   punch reads, so it is safe to land late.
+   ================================================================ */
+      function fitTagsToSafeArea() {
+        const vpBox = frameEl.getBoundingClientRect();
+        const prevTransform = pageEl.style.transform;
+        const limit = CANVAS_H - SAFE_BOTTOM - SAFE_PAD;
+        pageEl.style.transition = "none";
+
+        PANELS.forEach((p) => {
+          const tag = panelEls[p.id].querySelector(".panel-tag");
+          if (!tag) return;
+          pageEl.style.transform = transformFor(String(p.id));
+          void pageEl.offsetWidth;
+          const r = tag.getBoundingClientRect();
+          const over = r.top - vpBox.top + r.height - limit;
+          if (over <= 0) return;
+          const base = parseFloat(getComputedStyle(tag).bottom) || 0;
+          tag.style.bottom = base + over / scaleFor(p) + "px";
+        });
+
+        pageEl.style.transform = prevTransform;
+        void pageEl.offsetWidth;
+        pageEl.style.transition = "";
+      }
+
+      if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(fitTagsToSafeArea);
+      } else {
+        fitTagsToSafeArea();
+      }
+
       /* Shared mutable state, declared up front — applyPunch() runs as soon as
          the first scene arrives, which can be before the sections below have
          been evaluated. */
@@ -1193,6 +1508,15 @@
       const srcSize = new Map(); /* sourceName -> {w, h} in source pixels */
       const itemOn = new Map(); /* sourceName -> enabled, as OBS last reported */
       const managed = new Set(holeEls.map((h) => h.src));
+
+      /* The browser stands in for the game while it is UNMUTED, exactly as on
+         the horizontal page — same input, same mute, so one switch moves both
+         canvases. Not in `managed`: a VCOMIC without Browser is complete, so
+         its absence must not keep the rebind loop below spinning. */
+      const BROWSER = "Browser";
+      let browserLive = false;
+      const feed = (src) =>
+        src === "Game" && browserLive && itemIds.has(BROWSER) ? BROWSER : src;
 
       /* ================================================================
    HOLE PUNCH — masks generated from the same PANELS config.
@@ -1387,15 +1711,21 @@
      translate(-panel centre)
    ================================================================ */
       let current = null;
+      /* The panel's resting scale. Shared with fitTagsToSafeArea(), which
+         must not measure it off a rendered rect — getBoundingClientRect
+         returns a rotated AABB, and every panel here is tilted. */
+      function scaleFor(p) {
+        const sx = CANVAS_W / p.w,
+          sy = CANVAS_H / p.h;
+        return p.fit === "fill" ? Math.max(sx, sy) : Math.min(sx, sy) * 0.97;
+      }
       function transformFor(t) {
         if (t === "page") {
           const s = Math.min(CANVAS_W / PAGE_W, CANVAS_H / PAGE_H) * 0.94;
           return `translate(${CANVAS_W / 2}px,${CANVAS_H / 2}px) scale(${s}) translate(${-PAGE_W / 2}px,${-PAGE_H / 2}px)`;
         }
         const p = PANELS.find((v) => v.id === Number(t));
-        const sx = CANVAS_W / p.w,
-          sy = CANVAS_H / p.h;
-        const s = p.fit === "fill" ? Math.max(sx, sy) : Math.min(sx, sy) * 0.97;
+        const s = scaleFor(p);
         const cx = p.x + p.w / 2,
           cy = p.y + p.h / 2;
         return `translate(${CANVAS_W / 2}px,${CANVAS_H / 2}px) rotate(${-p.rot}deg) scale(${s}) translate(${-cx}px,${-cy}px)`;
@@ -1658,7 +1988,15 @@
             const cs = r.canvases || [];
             const pick = VERT_CANVAS
               ? cs.find((c) => c.canvasName === VERT_CANVAS)
-              : cs.find((c) => !(c.canvasFlags && c.canvasFlags.MAIN));
+              : cs.find(
+                  /* A canvas outlives the plugin that drove it — it is saved
+                     in the scene collection — and an orphan reports a null
+                     base size. Skip it, or the pick lands on a dead canvas. */
+                  (c) =>
+                    !(c.canvasFlags && c.canvasFlags.MAIN) &&
+                    c.canvasVideoSettings &&
+                    c.canvasVideoSettings.baseWidth,
+                );
             if (!pick)
               throw new Error(
                 VERT_CANVAS
@@ -1709,7 +2047,8 @@
           const msg = JSON.parse(ev.data);
 
           if (msg.op === 0) {
-            const d = { rpcVersion: 1, eventSubscriptions: 1 | 4 };
+            /* General | Scenes | Inputs — Inputs for Browser's mute. */
+            const d = { rpcVersion: 1, eventSubscriptions: 1 | 4 | 8 };
             if (msg.d.authentication) {
               if (!WS_PW) {
                 hud("websocket: server wants a password, none given", true);
@@ -1737,12 +2076,21 @@
               )
               .catch(() => {});
             resolveVerticalScene();
+            request("GetInputMute", { inputName: BROWSER })
+              .then((r) => setBrowserLive(!r.inputMuted))
+              .catch(() => setBrowserLive(false));
             return;
           }
 
           if (msg.op === 5) {
+            const e = msg.d.eventData || {};
             if (msg.d.eventType === "CurrentProgramSceneChanged")
-              applyScene(msg.d.eventData.sceneName, "websocket");
+              applyScene(e.sceneName, "websocket");
+            else if (e.inputName === BROWSER) {
+              if (msg.d.eventType === "InputMuteStateChanged")
+                setBrowserLive(!e.inputMuted);
+              else if (msg.d.eventType === "InputRemoved") setBrowserLive(false);
+            }
             return;
           }
 
@@ -1821,6 +2169,15 @@
           });
       }
 
+      /* No pan: the same hole changes feed. Re-read the item list so a
+         Browser added after boot binds, with the size its crop needs. */
+      function setBrowserLive(live) {
+        if (live === browserLive) return;
+        browserLive = live;
+        hud(`browser ${live ? "on air" : "off air"}`);
+        if (wsReady) loadItemIds({ quiet: true });
+      }
+
       function sendBatch(requests) {
         ws.send(
           JSON.stringify({
@@ -1879,14 +2236,15 @@
         const reqs = [];
         rects.forEach((r) => {
           if (!punched.has(r.hole)) return;
-          const id = itemIds.get(r.src);
+          const src = feed(r.src);
+          const id = itemIds.get(src);
           if (!id) return;
           reqs.push({
             requestType: "SetSceneItemTransform",
             requestData: {
               sceneUuid: vertSceneUuid,
               sceneItemId: id,
-              sceneItemTransform: fillTransform(r, srcSize.get(r.src)),
+              sceneItemTransform: fillTransform(r, srcSize.get(src)),
             },
           });
         });
@@ -1909,10 +2267,10 @@
 
       function syncVisibility() {
         if (!wsReady || !vertSceneUuid || !itemIds.size) return;
-        const used = new Set([...punched].map((h) => h.src));
+        const used = new Set([...punched].map((h) => feed(h.src)));
         const reqs = [];
         itemIds.forEach((id, name) => {
-          if (!managed.has(name)) return;
+          if (!managed.has(name) && name !== BROWSER) return;
           if (itemOn.get(name) === false) {
             reqs.push({
               requestType: "SetSceneItemEnabled",

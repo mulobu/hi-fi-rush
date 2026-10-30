@@ -33,6 +33,18 @@ assets/*
 # out of manifest.json, which names the webp. 9 MB for a spare.
 mascot/deer/sheet.png
 
+# chat/ is the one part of the repo with pip dependencies -- Piper and its
+# onnxruntime -- so it carries its own venv, and tools/ stays standard library.
+# Voices are ~60 MB of model each, fetched from Hugging Face, never committed.
+chat/.venv/
+chat/voices/
+
+# The TTS blocklist is personal, and it is a list of slurs -- not something to
+# publish with the repo. It is also the one chat file nothing can regenerate,
+# so copy it by hand when you move machines; the bridge refuses to read chat
+# aloud without it, and start.py and obs-setup.py --check both say so.
+chat/blocklist.txt
+
 # Local-only Claude Code settings
 .claude/settings.local.json
 

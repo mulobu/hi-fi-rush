@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+  <defs><filter id="lift" x="-10%" y="-10%" width="130%" height="130%"><feOffset in="SourceAlpha" dx="3.5" dy="3.5" result="o"/><feFlood flood-color="#16161d" flood-opacity=".38"/><feComposite in2="o" operator="in" result="s"/><feMerge><feMergeNode in="s"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+  <polygon points="7,24 34,19 66,23 97,17 114,27 110,58 115,93 84,99 52,96 19,101 6,89 10,57" fill="#f4f1e8" stroke="#16161d" stroke-width="3" stroke-linejoin="round"/>
+  <g filter="url(#lift)" transform="rotate(-3 60 60)">
+    <rect x="17" y="31" width="86" height="60" rx="17" fill="#ff0033"/>
+    <polygon points="50,46 50,76 77,61" fill="#f4f1e8"/>
+  </g>
+  <rect x="44" y="6" width="36" height="13" fill="#f4f1e8" fill-opacity=".72" stroke="#16161d" stroke-opacity=".35" stroke-width="1.5" transform="rotate(-8 62 12)"/>
+</svg>
