@@ -1207,24 +1207,6 @@
         }
       }
 
-      /* ================================================================
-   PAGE HOOKS — what core/ needs from this page (core/README.md).
-
-   The horizontal page drives COMIC by name: Main's scenes resolve by
-   sceneName, and COMIC is complete and on program from the moment OBS
-   starts, so there is nothing to resolve and nothing to retry.
-   ================================================================ */
-      const HOST_SCENE = OVERLAY_CONTRACT.host.main;
-      const PAGE = {
-        label: "overlay",
-        host: HOST_SCENE,
-        hostKey: () => ({ sceneName: HOST_SCENE }),
-        onIdentified: () => loadItemIds(),
-        onClosed: () => {},
-        onItemsMissing: () => {},
-        onItemsFailed: () => {},
-        hudState: () => "",
-      };
     </script>
     <script src="../../core/socials.js"></script>
     <script src="../../core/panel-page.js"></script>
@@ -1237,6 +1219,7 @@
    BOOT — after every core file, so nothing below can reach a
    declaration that has not been evaluated yet.
    ================================================================ */
+      const PAGE = mainPage("overlay");
       applyPunch(-1); /* nothing live yet — page fully opaque */
       listenObsStudio();
       seedFromObsStudio(0);

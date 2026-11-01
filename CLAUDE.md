@@ -9,7 +9,8 @@ for it, which is why its names (`COMIC`, panels, the page) run through it.
 
 | Where | What |
 | --- | --- |
-| `overlays/<name>/` | One overlay: `overlay.html`, `vertical.html`, `chat.css`, `mascot/placement*.json`, `obs/scenes.json`, its own `CLAUDE.md` |
+| `overlays/<name>/` | One overlay: `overlay.json`, `overlay.html`, `vertical.html`, `chat.css`, `mascot/placement*.json`, `obs/scenes.json`, its own `CLAUDE.md`. `overlays/_template/` is where a new one starts |
+| `core/` | The page code every overlay shares, and `contract.js`, the names they all use. `core/README.md` is the page contract |
 | `tools/obs-setup.py` | Builds and checks the OBS side; the deck runs it for CLIP and GO LIVE |
 | `start.py`, `chat/`, `mascot/` | Bridges, chat TTS, the mascot page and its sprite sets (`mascot/sets/`) |
 | `assets/` | Shared brand: `socials/` committed; LUTs and workshop scratch gitignored |
@@ -23,7 +24,7 @@ Sections keep their original numbers, so every `§N` still resolves: §1, §4 an
 
 ```
 OBS scene: COMIC          <- the only real scene
-├── Deer      (Browser 1920x1080)   TOP — mascot, over the art
+├── Mascot    (Browser 1920x1080)   TOP — mascot, over the art; only if the overlay has one
 ├── Overlay   (Browser 1920x1080)         comic art, masks video spill
 ├── Chat      (Browser)
 ├── Cam       (Video Capture Device)
@@ -65,7 +66,7 @@ script — it puts the real path and that machine's own password back.
 behind a punched hole; the mascot cannot be, because a punched hole is a
 transparent rectangle and would cut a mascot-shaped box out of the comic art
 with nothing behind it. Above the overlay, its own alpha composites for free.
-`Deer` is therefore not in `managed` and the overlay never touches it — it reads
+`Mascot` is therefore not in `managed` and the overlay never touches it — it reads
 the scene name for itself and positions itself from `overlays/hi-fi-rush/mascot/placement.json`, in
 camera-space pixels. The two pages share one fact, the scene name, and no code.
 
@@ -1252,9 +1253,14 @@ Real ceiling is encoder sessions — mix NVENC and QuickSync/x264 across outputs
 6n. ✅ Shared page code into `core/`, out of `overlay.html` and `vertical.html`;
     pages plug in through a `PAGE` hooks object. All twelve punch sets read
     back unchanged, 2026-11-01 (ADR 0006, 0009)
-6o. ⬜ `overlay.json` and `--overlay`: one scene collection per overlay, the
-    mascot optional and renamed `Mascot` / `MascotV` (ADR 0003–0005)
-6p. ⬜ `overlays/_template/`, then the second show's overlay
+6o. ✅ `overlay.json` and `--overlay`: one scene collection per overlay, names
+    from `core/contract.js`, the mascot optional and renamed `Mascot` /
+    `MascotV`; `start.py --overlay / --profile` (ADR 0003–0005, 0010).
+    ⬜ Live: collection `Untitled` → `Hi-Fi Rush`, then one setup run renames
+    `Deer` → `Mascot`
+6p. ✅ `overlays/_template/` and `core/vertical.js` (ADR 0011). ⬜ The template
+    built as its own collection — the fresh-collection measurement; the
+    second show's own overlay, once designed
 7. ⬜ Failsafes + panic key
 8. ⬜ Alert layer + queue, Streamer.bot / EventSub feed
 9. ⬜ Self-host fonts, go live
@@ -1388,11 +1394,18 @@ Real ceiling is encoder sessions — mix NVENC and QuickSync/x264 across outputs
   on: press once on a scene switch, then check that row's `vod` lands on the
   switch in the Restream recording. If it is 120 s late, the delay is already
   counted and `vod` should be `stream` alone.
-- **Left over from the move to one repo (2026-11-01).** The GitHub repo is still
-  named `hi-fi-rush`. The scene collection is still `Untitled`; it becomes
-  `Hi-Fi Rush` in step 6o, where the name starts to matter.
-  `overlays/hi-fi-rush/obs/scenes.json` still predates 2026-10-25 and needs a
-  re-export after OBS next quits cleanly.
+- **Left over from the move to one repo (2026-11-01).**
+  - The GitHub repo is still named `hi-fi-rush`.
+  - **The scene collection is still `Untitled`.** Until it is renamed `Hi-Fi
+    Rush` (Scene Collection → Rename), a plain `obs-setup.py` refuses and
+    names `--overlay`, and the `Deer` / `DeerV` sources keep their old names
+    — the pages do not care, `obs-setup.py --check` reports them.
+  - `overlays/hi-fi-rush/obs/scenes.json` still predates 2026-10-25 and needs
+    a re-export after the rename.
+  - **Not measured: a fresh collection.** Whether the vertical plugin gives it
+    a canvas, and which audio devices it starts with. Building the template
+    answers both (ADR 0011).
+  - **`shows.json`**, day → overlay + profile, waits for the schedule.
 
 ---
 

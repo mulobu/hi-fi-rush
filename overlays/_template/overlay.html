@@ -1,0 +1,426 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Overlay Template — OBS</title>
+    <!--
+      The starting point for a new overlay: copy overlays/_template/ to
+      overlays/<name>/ and replace the art. Everything that talks to OBS --
+      scene detection, the punched holes, moving sources into them -- is
+      core/, shared with every overlay (core/README.md). What is here is the
+      design: page size, panels, holes, art, CSS.
+
+      Six panels, one per scene, each exactly 16:9, so `fill` lands every
+      scene square on the frame. Change the layout freely; keep a panel's
+      border at 15px (PANEL_BORDER in core/panel-page.js).
+    -->
+    <style>
+      /* ============================================================
+   TOKENS — this overlay's own. Replace them.
+   ============================================================ */
+      :root {
+        --ink: #16161d;
+        --paper: #f4f1e8;
+        --gutter: #2a2d3a;
+        --panel: #3b4a9e;
+        --accent: #35d6e8;
+
+        --canvas-w: 1920px;
+        --canvas-h: 1080px;
+        --page-w: 7424px; /* = PAGE_W */
+        --page-h: 2876px; /* = PAGE_H */
+        /* How far the page's paint overhangs it. Must exceed the worst bleed
+           DURING a pan, not at rest (root CLAUDE.md §2). With every panel
+           filling the frame the bleed is small; 3000 is the comic page's
+           figure and costs nothing. */
+        --page-skirt: 3000px;
+
+        --pan-ms: 900ms; /* core/camera-pan.js reads this */
+        --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+        --f-body: system-ui, "Segoe UI", sans-serif;
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        /* Transparent: a dead browser source shows what OBS has behind it,
+           not a white box. */
+        background: transparent;
+        font-family: var(--f-body);
+        color: var(--paper);
+        overflow: hidden;
+        width: var(--canvas-w);
+        height: var(--canvas-h);
+      }
+
+      /* FRAME — the viewport IS the OBS canvas. Nothing scales it: 1px here
+         is 1px in OBS, which is why hole rects need no conversion. */
+      .viewport {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: var(--canvas-w);
+        height: var(--canvas-h);
+        overflow: hidden;
+        background: transparent;
+      }
+      .shaker {
+        position: absolute;
+        inset: 0;
+      }
+      /* camera-pan.js adds .shake as a pan lands. A settle, not a shake. */
+      .shaker.shake {
+        animation: settle 160ms ease-out;
+      }
+      @keyframes settle {
+        50% {
+          transform: translate(0, 4px);
+        }
+      }
+
+      .page {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: var(--page-w);
+        height: var(--page-h);
+        transform-origin: 0 0;
+        transition: transform var(--pan-ms) var(--ease);
+        will-change: transform;
+        /* Paints nothing: a mask on it would cut every panel too. */
+      }
+      /* The page's paint: .page-under carries the cuts; four skirt bands go
+         around it. Never one element at inset: -skirt — unmasked, it would
+         seal every cut and no video would show (root CLAUDE.md §2). */
+      .skirt-n,
+      .skirt-s,
+      .skirt-w,
+      .skirt-e {
+        position: absolute;
+        background: var(--gutter);
+      }
+      .skirt-n,
+      .skirt-s {
+        left: calc(-1 * var(--page-skirt));
+        right: calc(-1 * var(--page-skirt));
+        height: var(--page-skirt);
+      }
+      .skirt-n {
+        top: calc(-1 * var(--page-skirt));
+      }
+      .skirt-s {
+        top: 100%;
+      }
+      .skirt-w,
+      .skirt-e {
+        top: 0;
+        height: var(--page-h);
+        width: var(--page-skirt);
+      }
+      .skirt-w {
+        left: calc(-1 * var(--page-skirt));
+      }
+      .skirt-e {
+        left: 100%;
+      }
+      .page-under {
+        position: absolute;
+        inset: 0;
+        background: var(--gutter);
+      }
+
+      /* ============================================================
+   PANELS. The border must stay 15px: core/panel-page.js computes
+   every hole's page-space rect from PANEL_BORDER.
+   ============================================================ */
+      .panel {
+        position: absolute;
+        overflow: hidden;
+        border: 15px solid var(--ink);
+        border-radius: 28px;
+        background: var(--panel);
+      }
+      /* Under the holes, and the only masked part of a panel. The panel's
+         background is moved here at build time. */
+      .under {
+        position: absolute;
+        inset: 0;
+      }
+      /* A window. One OBS source sits behind it while it is punched. */
+      .hole {
+        position: absolute;
+        background: transparent;
+        overflow: hidden;
+        border: 8px solid var(--ink);
+        border-radius: 14px;
+      }
+      .hole.bare {
+        border: 0;
+        border-radius: 0;
+      }
+      /* What a hole shows while another panel has its source. */
+      .fake-source {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        background: rgba(22, 22, 29, 0.35);
+      }
+      .src-label {
+        font-weight: 800;
+        font-size: 40px;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: rgba(255, 255, 255, 0.5);
+      }
+      .hole.punched .fake-source {
+        display: none;
+      }
+      .panel-tag {
+        position: absolute;
+        left: 32px;
+        bottom: 32px;
+        z-index: 8;
+        padding: 8px 24px;
+        background: var(--ink);
+        color: var(--paper);
+        font-weight: 800;
+        font-size: 46px;
+        letter-spacing: 0.06em;
+        pointer-events: none;
+      }
+      .panel.is-live .panel-tag {
+        box-shadow: 0 0 0 5px var(--accent);
+      }
+
+      /* ============================================================
+   ART — replace freely. Tag an element `over` to lift it above the
+   video instead of under it.
+   ============================================================ */
+      .title {
+        position: absolute;
+        left: 6%;
+        top: 12%;
+        font-size: 150px;
+        font-weight: 900;
+        line-height: 0.95;
+      }
+      .countdown {
+        position: absolute;
+        left: 6%;
+        top: 56%;
+        font-size: 120px;
+        font-weight: 800;
+        font-variant-numeric: tabular-nums;
+        color: var(--accent);
+      }
+
+      /* DEBUG HUD — ?debug=1 only. */
+      .hud {
+        position: absolute;
+        right: 14px;
+        top: 14px;
+        max-width: 720px;
+        background: rgba(5, 5, 10, 0.93);
+        border: 2px solid var(--accent);
+        padding: 11px 13px;
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 12px;
+        line-height: 1.55;
+        color: var(--accent);
+        z-index: 60;
+        pointer-events: none;
+        white-space: pre;
+      }
+      .hud h4 {
+        font-size: 15px;
+        letter-spacing: 0.14em;
+        margin-bottom: 6px;
+      }
+      .hud .off {
+        color: #4a4a55;
+      }
+      .hud .warn {
+        color: #f5d030;
+      }
+      .hud[hidden] {
+        display: none;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .page {
+          transition-duration: 0.01ms;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="viewport" id="viewport">
+      <div class="shaker" id="shaker"><div class="page" id="page"></div></div>
+    </div>
+
+    <div class="hud" id="hud" hidden>
+      <h4>TEMPLATE DEBUG</h4>
+      <div id="hudState"></div>
+      <div id="hudRects"></div>
+      <div id="hudLog"></div>
+    </div>
+
+    <script src="../../core/contract.js"></script>
+    <script src="../../core/base.js"></script>
+    <script>
+      const PAGE_W = 7424,
+        PAGE_H = 2876,
+        CANVAS_W = 1920,
+        CANVAS_H = 1080;
+
+      /* ================================================================
+   PANEL CONFIG — one panel per scene, 2400 x 1350 (16:9), in a 3 x 2
+   grid: margin 64, gutter 48.
+
+   holes[] are percentages of the panel's CONTENT box (2370 x 1320, the
+   panel minus its 15px border). Each maps to one OBS source by name —
+   the names are core/contract.js's. A source fills its hole by crop,
+   so any aspect works; 16:9 holes lose nothing off a 16:9 source.
+   ================================================================ */
+      const PANELS = [
+        {
+          id: 1,
+          key: "start",
+          cls: "p-start",
+          x: 64,
+          y: 64,
+          w: 2400,
+          h: 1350,
+          rot: 0,
+          fit: "fill",
+          tag: "STARTING",
+          holes: [{ src: "Cam", x: 55, y: 30, w: 40, h: 40.4, label: "Cam", c: "#333" }],
+        },
+        {
+          id: 2,
+          key: "chat",
+          cls: "p-chat",
+          x: 2512,
+          y: 64,
+          w: 2400,
+          h: 1350,
+          rot: 0,
+          fit: "fill",
+          tag: "CHAT",
+          holes: [
+            { src: "Chat", x: 58, y: 8, w: 38, h: 76, label: "Chat", c: "#333" },
+            { src: "Cam", x: 4, y: 30, w: 50, h: 50.5, label: "Cam", c: "#333" },
+          ],
+        },
+        {
+          id: 3,
+          key: "game",
+          cls: "p-game",
+          x: 4960,
+          y: 64,
+          w: 2400,
+          h: 1350,
+          rot: 0,
+          fit: "fill",
+          tag: "GAME",
+          /* The game IS the panel; the cam sits inside it. A hole inside
+             another is fine — mergeCuts drops the inner cut. */
+          holes: [
+            { src: "Game", x: 0, y: 0, w: 100, h: 100, bare: true, label: "Game", c: "#222" },
+            { src: "Cam", x: 72, y: 66, w: 25, h: 25.2, label: "Cam", c: "#333" },
+          ],
+        },
+        {
+          id: 4,
+          key: "cam",
+          cls: "p-cam",
+          x: 64,
+          y: 1462,
+          w: 2400,
+          h: 1350,
+          rot: 0,
+          fit: "fill",
+          tag: "CAM",
+          holes: [{ src: "Cam", x: 10, y: 4, w: 80, h: 80.8, label: "Cam", c: "#333" }],
+        },
+        {
+          id: 5,
+          key: "brb",
+          cls: "p-brb",
+          x: 2512,
+          y: 1462,
+          w: 2400,
+          h: 1350,
+          rot: 0,
+          fit: "fill",
+          tag: "BRB",
+          holes: [],
+        },
+        {
+          id: 6,
+          key: "end",
+          cls: "p-end",
+          x: 4960,
+          y: 1462,
+          w: 2400,
+          h: 1350,
+          rot: 0,
+          fit: "fill",
+          tag: "THE END",
+          holes: [{ src: "Cam", x: 55, y: 30, w: 40, h: 40.4, label: "Cam", c: "#333" }],
+        },
+      ];
+
+      /* Scene name -> the panel it pans to. The names are the contract's;
+         which panel each one shows is this page's. */
+      const SCENE_MAP = {
+        START: 1,
+        CHAT: 2,
+        GAME: 3,
+        CAM: 4,
+        BRB: 5,
+        END: 6,
+      };
+
+      /* The panel's resting scale: `fill` covers the frame, `fit` shows the
+         whole panel with a little page around it. */
+      function scaleFor(p) {
+        const sx = CANVAS_W / p.w,
+          sy = CANVAS_H / p.h;
+        return p.fit === "fill" ? Math.max(sx, sy) : Math.min(sx, sy) * 0.97;
+      }
+
+      /* Each panel's art, as HTML, under its holes. */
+      function artFor(p) {
+        switch (p.key) {
+          case "start":
+            return `<div class="title">Starting<br>soon</div>
+              <div class="countdown" id="countdown">05:00</div>`;
+          case "brb":
+            return `<div class="title">Be right<br>back</div>`;
+          case "end":
+            return `<div class="title">Thanks for<br>watching</div>`;
+          default:
+            return "";
+        }
+      }
+    </script>
+    <script src="../../core/socials.js"></script>
+    <script src="../../core/panel-page.js"></script>
+    <script src="../../core/obs-link.js"></script>
+    <script src="../../core/holes.js"></script>
+    <script src="../../core/camera-pan.js"></script>
+    <script src="../../core/hud.js"></script>
+    <script>
+      /* BOOT — after every core file (core/README.md). */
+      const PAGE = mainPage("overlay");
+      applyPunch(-1); /* nothing live yet — page fully opaque */
+      listenObsStudio();
+      seedFromObsStudio(0);
+      connect();
+      startHud();
+    </script>
+  </body>
+</html>

@@ -13,7 +13,8 @@ these files and the page see each other.
 | `base.js` | `params`, `DEBUG` |
 | `socials.js` | `SOCIALS`, `SOCIAL_NAMES` (from the contract), `socialsFor()` |
 | `panel-page.js` | Builds the page from `PANELS`: skirts, panels, holes, their page-space geometry; the `#countdown` ticker |
-| `obs-link.js` | Scene detection (`applyScene`, `listenObsStudio`, `seedFromObsStudio`) and the obs-websocket client (`connect`, `request`) |
+| `obs-link.js` | Scene detection (`applyScene`, `listenObsStudio`, `seedFromObsStudio`), the obs-websocket client (`connect`, `request`), and `mainPage()` |
+| `vertical.js` | For pages on the vertical canvas: the platform safe zones and `fitTagsToSafeArea`, finding the canvas and its scene by uuid, and `verticalPage()`. Load after `base.js` |
 | `holes.js` | Hole/source state, masks and `applyPunch`, tracking, and placing OBS sources: `loadItemIds`, `pushRects`, `syncVisibility` |
 | `camera-pan.js` | The comic pan: `transformFor`, `goTo`. One transition; see "Another transition" |
 | `hud.js` | The `?debug=1` readout, `startHud()` |
@@ -23,7 +24,8 @@ these files and the page see each other.
 ```html
 <script src="../../core/contract.js"></script>
 <script src="../../core/base.js"></script>
-<script> /* the page's config and hooks — below */ </script>
+<script src="../../core/vertical.js"></script>   <!-- vertical pages only -->
+<script> /* the page's config — below */ </script>
 <script src="../../core/socials.js"></script>
 <script src="../../core/panel-page.js"></script>
 <script src="../../core/obs-link.js"></script>
@@ -50,10 +52,11 @@ Before `socials.js`:
 | `SCENE_MAP` | Trigger scene name → panel id. Every scene in `OVERLAY_CONTRACT.scenes` should map |
 | `scaleFor(p)` | A panel's resting scale |
 | `artFor(p)` | The panel's art, as HTML. Tag an element `over` to lift it above the video |
-| `PAGE` | The hooks, below |
 
 `PAGE` is how the page tells core which scene it drives and what to do when
-the connection changes:
+the connection changes. The boot script makes it with `mainPage(label)` (a
+page on the main canvas) or `verticalPage(label)` (the vertical canvas), or
+writes its own object with the same fields:
 
 | Hook | Horizontal (`overlay.html`) | Vertical (`vertical.html`) |
 | --- | --- | --- |
@@ -70,14 +73,19 @@ The DOM it expects: `#viewport` › `#shaker` › `#page`, and `#hud` with
 `#hudState`, `#hudRects`, `#hudLog`. `--pan-ms` on `:root`. The classes
 `panel-page.js` writes — `.panel`, `.under`, `.hole`, `.fake-source`,
 `.panel-tag`, `.over`, `.page-under`, `.skirt-*`, `.socials` — are the page's
-to style.
+to style, with two rules: `.panel`'s border is **15px** (`PANEL_BORDER`, which
+every hole's page-space rect is computed from), and `.hole.punched
+.fake-source` is hidden, or a punched hole shows its placeholder over the
+video. `overlays/_template/` has the minimal CSS that satisfies all of it.
 
 ## Boot
 
 ```js
+const PAGE = mainPage("overlay");     // or verticalPage("vertical")
+// vertical only: document.fonts.ready.then(fitTagsToSafeArea);
 applyPunch(-1);          // nothing live yet — page fully opaque
 listenObsStudio();
-seedFromObsStudio(0);    // horizontal only; vertical relies on the websocket
+seedFromObsStudio(0);    // main canvas only; vertical relies on the websocket
 connect();
 startHud();
 ```

@@ -1,0 +1,12 @@
+{
+  "_comment": [
+    "Copy this folder to overlays/<name>/ and change name and collection.",
+    "collection: the OBS scene collection the overlay lives in, one per",
+    "  overlay (docs/adr/0003). tools/obs-setup.py --overlay <name> creates it.",
+    "mascot: add { \"set\": \"<a folder in mascot/sets/>\" } and a mascot/",
+    "  folder with placement.json and placement-vertical.json to have one.",
+    "  Without the key there is none (docs/adr/0005)."
+  ],
+  "name": "Overlay Template",
+  "collection": "Overlay Template"
+}

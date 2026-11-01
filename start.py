@@ -3,15 +3,28 @@
 start -- everything that has to be running while you stream, in one command.
 
     python3 start.py                 Windows: py -3 start.py
+    python3 start.py --overlay hi-fi-rush
+                                     today's show: OBS on that overlay's
+                                     scene collection
+    python3 start.py --overlay hi-fi-rush --profile vALO
+                                     ...and on that Restream setup
     python3 start.py --display 1     mascot follows the cursor on display 1
     python3 start.py --only chat     just one bridge: mascot or chat
     python3 start.py --no-obs        do not launch OBS
 
 Starts, in this order:
 
-    mascot  mascot/bridge/cursor-bridge.py   127.0.0.1:4460   Deer, DeerV
+    mascot  mascot/bridge/cursor-bridge.py   127.0.0.1:4460   Mascot, MascotV
     chat    chat/chat-bridge.py              127.0.0.1:4461   Tts
     OBS     only if it is not already running, once both bridges listen
+
+With --overlay, OBS launches straight into the overlay's scene collection
+(overlays/<name>/overlay.json), and an OBS that is already running is
+switched to it over the websocket -- never while anything is live, since a
+collection switch reloads every source. --profile does the same for the
+profile, which picks the Restream setup and so the game. An overlay with no
+mascot gets no mascot bridge. Without --overlay, OBS opens on whatever it
+had last, as before.
 
 Bridges first, so each browser source finds its page on the first try rather
 than on a retry. Every line a bridge prints comes out here prefixed with its
@@ -38,6 +51,8 @@ from __future__ import annotations
 import argparse
 import ctypes
 import hashlib
+import importlib.util
+import json
 import os
 import shutil
 import socket
@@ -51,9 +66,18 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent
 WIN = sys.platform.startswith("win")
 
-MASCOT_PORT = 4460
-TTS_PORT = 4461                       # must match chat-bridge.py and obs-setup.py
-OBS_WS_PORT = 4455
+
+def load_contract() -> dict:
+    """core/contract.js, whose body is strict JSON (docs/adr/0004)."""
+    text = (REPO / "core" / "contract.js").read_text(encoding="utf-8")
+    start = text.index("=", text.index("window.OVERLAY_CONTRACT")) + 1
+    return json.loads(text[start:text.rindex("}") + 1])
+
+
+PORTS = load_contract()["ports"]
+MASCOT_PORT = PORTS["mascot"]
+TTS_PORT = PORTS["chat"]              # chat-bridge.py's default must match
+OBS_WS_PORT = PORTS["obs"]
 
 CHAT = REPO / "chat"
 VENV = CHAT / ".venv"
@@ -281,26 +305,77 @@ def obs_running() -> bool:
         return False
 
 
-def launch_obs() -> None:
-    """Detached: OBS must outlive this script, and must not get its Ctrl-C."""
+def launch_obs(flags: list) -> None:
+    """Detached: OBS must outlive this script, and must not get its Ctrl-C.
+    `flags` are OBS's own: --collection, --profile."""
     if WIN:
         if not OBS_EXE.exists():
             say("obs", "not found at %s -- start it yourself" % OBS_EXE)
             return
         # OBS has to start in its own bin folder or it cannot find its locale
         # files and quits.
-        subprocess.Popen([str(OBS_EXE)], cwd=str(OBS_EXE.parent),
+        subprocess.Popen([str(OBS_EXE)] + flags, cwd=str(OBS_EXE.parent),
                          creationflags=0x00000008 | 0x00000200,  # DETACHED | NEW_GROUP
                          close_fds=True)
     elif sys.platform == "darwin":
-        subprocess.Popen(["open", "-a", "OBS"])
+        subprocess.Popen(["open", "-a", "OBS"] + (["--args"] + flags if flags else []))
     else:
         exe = shutil.which("obs")
         if not exe:
             say("obs", "not on PATH -- start it yourself")
             return
-        subprocess.Popen([exe], start_new_session=True)
-    say("obs", "launched")
+        subprocess.Popen([exe] + flags, start_new_session=True)
+    say("obs", "launched" + (" " + " ".join(flags) if flags else ""))
+
+
+def switch_obs(collection: str, profile: str) -> None:
+    """Put a running OBS on this collection and profile, over the websocket.
+    Borrows obs-setup.py's client rather than carrying a second one. Refused
+    while anything is live: either switch reloads sources or outputs."""
+    spec = importlib.util.spec_from_file_location("obs_setup", REPO / "tools/obs-setup.py")
+    setup = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(setup)
+    try:
+        obs = setup.OBS("127.0.0.1", OBS_WS_PORT, setup.discover_password())
+    except OSError as e:
+        say("obs", "running, but the websocket is not reachable (%s) -- switch "
+                   "the collection by hand" % e)
+        return
+    try:
+        cl = obs.req("GetSceneCollectionList")
+        pl = obs.req("GetProfileList")
+        moves = []
+        if collection and cl["currentSceneCollectionName"] != collection:
+            if collection not in cl["sceneCollections"]:
+                say("obs", "no scene collection %r yet -- build it with "
+                           "tools/obs-setup.py --overlay" % collection)
+            else:
+                moves.append("collection")
+        if profile and pl["currentProfileName"] != profile:
+            if profile not in pl["profiles"]:
+                say("obs", "no profile %r -- have: %s"
+                    % (profile, ", ".join(pl["profiles"])))
+            else:
+                moves.append("profile")
+        if not moves:
+            say("obs", "already on %s" % ", ".join(
+                filter(None, [collection and "collection %r" % collection,
+                              profile and "profile %r" % profile])))
+            return
+        live = setup.outputs_live(obs)
+        if live:
+            say("obs", "%s is running, so the %s stays as it is -- switching "
+                       "would reload it mid-stream" % (" and ".join(live),
+                                                       " and ".join(moves)))
+            return
+        if "collection" in moves:
+            obs.req("SetCurrentSceneCollection", {"sceneCollectionName": collection})
+            say("obs", "switched to scene collection %r" % collection)
+        if "profile" in moves:
+            obs.switch_profile(profile)
+            say("obs", "switched to profile %r" % profile)
+    finally:
+        obs.ws.close()
 
 
 # ---------------------------------------------------------------------------
@@ -316,11 +391,28 @@ def main() -> None:
                     help="start just one bridge")
     ap.add_argument("--no-obs", action="store_true",
                     help="do not launch OBS if it is not running")
+    ap.add_argument("--overlay", default="", metavar="NAME",
+                    help="today's overlay: OBS on overlays/NAME's scene collection")
+    ap.add_argument("--profile", default="", metavar="NAME",
+                    help="today's OBS profile, i.e. Restream setup")
     a = ap.parse_args()
+
+    collection, mascot = "", True
+    if a.overlay:
+        cfg_file = REPO / "overlays" / a.overlay / "overlay.json"
+        try:
+            cfg = json.loads(cfg_file.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as e:
+            raise SystemExit("start: cannot read %s (%s)" % (cfg_file, e))
+        collection, mascot = cfg["collection"], bool(cfg.get("mascot"))
+        say("start", "overlay %s -- collection %r%s" % (
+            a.overlay, collection, "" if mascot else ", no mascot"))
 
     job = Job()
     bridges = []
-    if a.only in (None, "mascot"):
+    if a.only in (None, "mascot") and not mascot:
+        say("mascot", "this overlay has none -- not started")
+    elif a.only in (None, "mascot"):
         if listening(MASCOT_PORT):
             say("mascot", "already listening on %d -- leaving it" % MASCOT_PORT)
         else:
@@ -336,11 +428,15 @@ def main() -> None:
 
     threads = [b.start() for b in bridges]
 
+    flags = ((["--collection", collection] if collection else []) +
+             (["--profile", a.profile] if a.profile else []))
     if not a.no_obs and not obs_running():
         deadline = time.time() + 15
         while time.time() < deadline and not all(listening(b.port) for b in bridges):
             time.sleep(0.25)
-        launch_obs()
+        launch_obs(flags)
+    elif not a.no_obs and flags:
+        switch_obs(collection, a.profile)
 
     if not bridges:
         say("start", "nothing to supervise")

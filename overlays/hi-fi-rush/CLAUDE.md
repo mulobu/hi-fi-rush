@@ -105,7 +105,7 @@ which were placeholders for exactly this.
 It walks between spots on the pan's own duration and easing, so it travels with
 the page rather than teleporting on the scene name.
 
-**The vertical mascot needed no code.** `DeerV` is a second browser source at
+**The vertical mascot needed no code.** `MascotV` is a second browser source at
 1080 × 1920, top of `VCOMIC`, pointed at the same bridge with
 `&place=placement-vertical.json`. `mascot.html` already took a `place` parameter
 and already derived every bound from `innerWidth`/`innerHeight` rather than
@@ -121,7 +121,7 @@ measured off the built page in canvas pixels rather than eyeballed:
 | BRB | inside `.mascot-frame` | frame is 171,773,636,622; a 460 cell centres in it |
 | CHAT | right gutter, small | the portrait panel leaves only 218px — the tightest, and first to drop if it reads badly |
 
-`DeerV` is last in the stack for the same reason `Deer` is last in COMIC: above
+`MascotV` is last in the stack for the same reason `Mascot` is last in COMIC: above
 the overlay, because a punched hole is a transparent rectangle and would put live
 video behind the mascot's own alpha instead of comic art.
 
@@ -134,7 +134,7 @@ three labels. The handles live once, in `core/contract.js`, and both pages
 read them through `core/socials.js` — a handle change is one edit.
 
 Each scene panel carries a `socials` entry. They are sized in **canvas px** via
-`--u = 1 / restScale(p)`, because panels rest at 0.33× to 1.17× and page-px sizes
+`--u = 1 / scaleFor(p)`, because panels rest at 0.33× to 1.17× and page-px sizes
 would make the handle 3.5× bigger on one scene than another. Always lifted `over`,
 since the game panel is all hole. `chat` places its stickers in the **gutter**
 (`page: {x, y}`), not the panel — at 0.33× there is no strip wide enough. Placed

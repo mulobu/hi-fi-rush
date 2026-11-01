@@ -8,10 +8,12 @@ one deck drives every show.
 | Overlay | What it is |
 | --- | --- |
 | [overlays/hi-fi-rush/](overlays/hi-fi-rush/) | Hi-Fi Rush inspired. The whole stream is one comic page; each OBS scene is one panel, and switching scenes pans the camera across the page |
+| [overlays/_template/](overlays/_template/) | Not a show: the plain, working starting point for a new overlay. Its README has the steps |
 
 | Path | What it is |
 | --- | --- |
 | [CLAUDE.md](CLAUDE.md) | Architecture, decisions, reliability — everything overlays share |
+| [core/](core/) | The page code every overlay shares: OBS link, punched holes, the pan. [core/README.md](core/README.md) is what a page must define |
 | [docs/adr/](docs/adr/) | Decision records, one dated file per decision |
 | [docs/OBS-SETUP.md](docs/OBS-SETUP.md) | Scene/source wiring in OBS, by hand |
 | [tools/obs-setup.py](tools/obs-setup.py) | The same wiring, asserted over obs-websocket |
@@ -85,12 +87,21 @@ While you are in Settings:
 
 ## 4. Build the scene collection
 
+Each overlay lives in its own OBS scene collection, named in its
+`overlays/<name>/overlay.json` ([ADR 0003](docs/adr/0003-one-scene-collection-per-overlay.md)):
+
 ```bash
-python3 tools/obs-setup.py
+python3 tools/obs-setup.py --overlay hi-fi-rush
 ```
 
+`--overlay` switches OBS to that overlay's collection first, or creates it if
+it does not exist — never while anything is live. Without it, the script
+builds whichever overlay the active collection belongs to. `--no-profiles`
+builds the collection and leaves every profile alone.
+
 It creates the `COMIC` host scene, the six trigger scenes, the video sources
-and the three browser sources — `Overlay`, `Deer`, and `Tts`, the chat TTS
+and the browser sources — `Overlay`, `Mascot` if the overlay has one, and
+`Tts`, the chat TTS
 player, parked off-canvas with its audio on "Monitor and Output"; puts them in
 the right stacking order; squares the
 nested `COMIC` up to the canvas in every trigger scene; and sets the transition
@@ -214,15 +225,18 @@ Settings → Output, with the encoder already correct.
 ## 7. Start everything
 
 ```bash
-python3 start.py
+python3 start.py --overlay hi-fi-rush
 ```
 
-On Windows, `py -3 start.py`. This is the one command to run before a stream.
-It starts both bridges and then OBS if it is not already open:
+On Windows, `py -3 start.py --overlay hi-fi-rush`. This is the one command to
+run before a stream — name the show's overlay, and OBS opens on its scene
+collection; add `--profile vALO` to pick the Restream setup too. An OBS that
+is already open is switched over the websocket instead, unless something is
+live. It starts both bridges and then OBS if it is not already open:
 
 | | What | Feeds |
 | --- | --- | --- |
-| `mascot` | `mascot/bridge/cursor-bridge.py` on 127.0.0.1:4460 | `Deer`, `DeerV` |
+| `mascot` | `mascot/bridge/cursor-bridge.py` on 127.0.0.1:4460 — only for an overlay with a mascot | `Mascot`, `MascotV` |
 | `chat` | `chat/chat-bridge.py` on 127.0.0.1:4461 | `Tts` |
 | OBS | launched detached, once both bridges are listening | — |
 
@@ -245,6 +259,8 @@ bridge refuses to start. `start.py` says so and starts the mascot anyway.
 
 | Flag | Does |
 | --- | --- |
+| `--overlay NAME` | open OBS on `overlays/NAME`'s scene collection, or switch a running OBS to it |
+| `--profile NAME` | the same for the OBS profile — the Restream setup |
 | `--display N` | mascot follows the cursor on display N (`py -3 mascot/bridge/cursor-bridge.py --list-displays`) |
 | `--only mascot` / `--only chat` | start just one bridge |
 | `--no-obs` | do not launch OBS |
@@ -294,7 +310,7 @@ the horizontal overlay and every hole rect it has pushed.
    This renames the plugin's own scene to `VCOMIC`, adds `Game` / `Cam` /
    `Chat` — the *same inputs* the horizontal canvas uses, with independent
    scene items, so the two overlays cannot fight over a transform — and creates
-   the `OverlayV` and `DeerV` browser sources above them.
+   the `OverlayV` and `MascotV` browser sources above them.
 4. **Click `VCOMIC` in the Aitum dock.** This is the one step nothing can
    automate. `SetCurrentProgramScene` refuses a scene that is not on the main
    canvas, `GetCurrentProgramScene` ignores the canvas argument and answers for
@@ -368,10 +384,10 @@ writes [overlays/hi-fi-rush/obs/scenes.json](overlays/hi-fi-rush/obs/scenes.json
 commit. On the new machine:
 
 1. OBS → **Scene Collection → Import** → pick `overlays/hi-fi-rush/obs/scenes.json`.
-2. Switch to the imported collection ("Comic Overlay").
+2. Switch to the imported collection ("Hi-Fi Rush").
 3. `python3 tools/obs-setup.py` — repairs the browser URLs, which the export
-   deliberately left as tokens: two for `Overlay` and `Deer`, or four with
-   `--vertical`, which adds `OverlayV` and `DeerV`.
+   deliberately left as tokens: two for `Overlay` and `Mascot`, or four with
+   `--vertical`, which adds `OverlayV` and `MascotV`.
 4. Point `Game` / `Cam` / `Chat` at your hardware, as in step 5.
 5. `--encoder auto` and the Aitum setup do not ride along in the collection —
    steps 6 and 9 again, on the new machine.
@@ -591,7 +607,7 @@ python3 start.py
 
 On Windows, `py -3 start.py`. That is all a stream needs: it starts the
 bridge, restarts it if it crashes, and prefixes its log with `[mascot]`.
-`obs-setup.py` creates the `Deer` source and keeps its settings right, so there
+`obs-setup.py` creates the `Mascot` source and keeps its settings right, so there
 is nothing to add in OBS by hand. `start.py --only mascot` runs just this one.
 
 ### Running the bridge directly
@@ -612,7 +628,7 @@ finds already listening alone.
 | --- | --- |
 | `--list-displays` | prints the displays it can see, and exits |
 | `--display N` | normalises the cursor against display N (default 0, the primary) |
-| `--port N` | listens on N instead of 4460 -- the `Deer` URLs would need changing too |
+| `--port N` | listens on N instead of 4460 -- the `Mascot` URLs and `ports.mascot` in `core/contract.js` would need changing too |
 | `--hz N` | cursor polling rate (default 60) |
 
 ### Adding the source by hand
@@ -624,7 +640,7 @@ http://127.0.0.1:4460/mascot/mascot.html?set=deer&overlay=hi-fi-rush
 ```
 
 Set it to **1920x1080**, and uncheck **Shutdown source when not visible** so the
-connection survives scene changes. Name the source `Deer` -- scenes UPPERCASE,
+connection survives scene changes. Name the source `Mascot` -- scenes UPPERCASE,
 sources TitleCase, per [CLAUDE.md](CLAUDE.md) §2.
 
 ## Where it sits, per scene
@@ -671,7 +687,7 @@ The three shipped spots:
 http://127.0.0.1:4460/mascot/mascot.html?set=deer&overlay=hi-fi-rush&edit=1
 ```
 
-Right-click the `Deer` source in OBS → **Interact**, switch to the scene you
+Right-click the `Mascot` source in OBS → **Interact**, switch to the scene you
 want in OBS, drag the mascot where you want it, and the panel prints the JSON
 line for *that* scene. Paste it into `placement.json` under `"scenes"`, refresh
 the browser source, done. Switch scenes and repeat.

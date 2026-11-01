@@ -13,6 +13,11 @@ clicking. See CLAUDE.md §2 for why the shape is what it is.
 
     python3 tools/obs-setup.py --check          report, change nothing
     python3 tools/obs-setup.py                  create and repair
+    python3 tools/obs-setup.py --overlay NAME   build overlays/NAME in its own
+                                                scene collection, switching to
+                                                it (or creating it) first
+    python3 tools/obs-setup.py --no-profiles    the collection only; leave
+                                                every profile alone
     python3 tools/obs-setup.py --placeholders   colour blocks, no hardware
     python3 tools/obs-setup.py --prune          also remove strays from COMIC
     python3 tools/obs-setup.py --export         write overlays/<name>/obs/scenes.json
@@ -57,26 +62,91 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 
-# The overlay this script builds. There is one for now; once
-# overlays/<name>/overlay.json exists, --overlay picks it and the scene
-# collection it lives in (docs/adr/0003).
-OVERLAY = "hi-fi-rush"
-OVERLAY_DIR = REPO / "overlays" / OVERLAY
+# The names every overlay shares -- trigger scenes, host scenes, sources,
+# ports -- live once, in core/contract.js, which the pages load as a script.
+# Its body is strict JSON, so this reads the very same file (docs/adr/0004).
+CONTRACT_FILE = REPO / "core" / "contract.js"
+
+
+def load_contract(path: Path = CONTRACT_FILE) -> dict:
+    text = path.read_text(encoding="utf-8")
+    start = text.index("=", text.index("window.OVERLAY_CONTRACT")) + 1
+    return json.loads(text[start:text.rindex("}") + 1])
+
+
+CONTRACT = load_contract()
+SRC = CONTRACT["sources"]
+
+# Names a collection may still hold from before the contract had them, and
+# what each is called now. Renamed in place with SetInputName, so the uuid,
+# the scene items and every setting carry over (docs/adr/0005).
+LEGACY_INPUTS = {"Deer": SRC["mascot"], "DeerV": SRC["mascotVertical"]}
+
+# The overlay being built -- overlays/<name>/ and its overlay.json -- chosen by
+# select_overlay() from --overlay or from the active scene collection, before
+# anything below reads it. Each overlay is its own collection (docs/adr/0003).
+OVERLAYS = REPO / "overlays"
+OVERLAY = ""
+OVERLAY_DIR = OVERLAYS
+OVERLAY_CFG: dict = {}
+
+
+def list_overlays() -> dict:
+    """Every overlays/<name>/overlay.json, by name. Read-only."""
+    out = {}
+    for d in sorted(OVERLAYS.iterdir()) if OVERLAYS.is_dir() else []:
+        f = d / "overlay.json"
+        if not f.is_file():
+            continue
+        try:
+            out[d.name] = json.loads(f.read_text(encoding="utf-8"))
+        except ValueError as e:
+            raise SystemExit("error: %s is not valid JSON: %s" % (f, e))
+    return out
+
+
+def overlay_for_collection(collection: str, overlays: dict) -> str:
+    hits = [n for n, c in overlays.items() if c.get("collection") == collection]
+    if len(hits) == 1:
+        return hits[0]
+    raise SystemExit(
+        "error: the active scene collection %r belongs to %s. Name the overlay "
+        "with --overlay: %s"
+        % (collection, "no overlay" if not hits else "more than one overlay",
+           ", ".join(sorted(overlays)) or "none in overlays/"))
+
+
+def select_overlay(name: str, overlays: dict) -> None:
+    global OVERLAY, OVERLAY_DIR, OVERLAY_CFG
+    if name not in overlays:
+        raise SystemExit("error: no overlays/%s/overlay.json -- have: %s"
+                         % (name, ", ".join(sorted(overlays)) or "none"))
+    cfg = overlays[name]
+    if not cfg.get("collection"):
+        raise SystemExit("error: overlays/%s/overlay.json names no collection" % name)
+    OVERLAY, OVERLAY_DIR, OVERLAY_CFG = name, OVERLAYS / name, cfg
+
+
+def has_mascot() -> bool:
+    """Optional per overlay: overlay.json's "mascot", or none (docs/adr/0005)."""
+    return bool(OVERLAY_CFG.get("mascot"))
+
 
 CANVAS_W, CANVAS_H = 1920, 1080
 
-HOST_SCENE = "COMIC"
+HOST_SCENE = CONTRACT["host"]["main"]
 
-# Scene name -> the panel it pans to. Must match SCENE_MAP in overlay.html.
-TRIGGERS = ["START", "CHAT", "GAME", "CAM", "BRB", "END"]
+# The scenes every overlay answers to. Which panel each one shows is the
+# overlay's own SCENE_MAP.
+TRIGGERS = CONTRACT["scenes"]
 
 # Bottom to top. The video sources sit under the overlay so its art can mask
 # their spill; the mascot sits over it, because a mascot punched through as a
 # hole would be a transparent rectangle instead of a sprite on comic art.
-MASCOT_PORT = 4460
+MASCOT_PORT = CONTRACT["ports"]["mascot"]
 
 # chat/chat-bridge.py serves chat/tts.html here. Must match TTS_PORT there.
-TTS_PORT = 4461
+TTS_PORT = CONTRACT["ports"]["chat"]
 
 # --- vertical canvas -------------------------------------------------------
 # A second 1080x1920 canvas, added by the Aitum Vertical Canvas plugin, which
@@ -94,7 +164,7 @@ VERT_W, VERT_H = 1080, 1920
 
 # Not COMIC: OBS shares one source namespace across canvases too, and a scene
 # is a source internally.
-VERT_SCENE = "VCOMIC"
+VERT_SCENE = CONTRACT["host"]["vertical"]
 
 # Bottom to top. The same inputs COMIC uses -- one input referenced from both
 # canvases, with independent scene items, so the horizontal and vertical
@@ -102,11 +172,15 @@ VERT_SCENE = "VCOMIC"
 # canvas needs exactly one scene and never switches, because vertical.html
 # reads the MAIN canvas's program scene to decide where to pan.
 #
-# DeerV is last for the same reason Deer is last in COMIC: above the overlay,
-# because a punched hole is a transparent rectangle and would put live video
-# behind the mascot's own alpha instead of comic art.
-VERT_STACK = ["Game", "Browser", "Cam", "Chat", "OverlayV", "DeerV"]
-VERT_MANAGED = set(VERT_STACK)
+# MascotV is last for the same reason Mascot is last in COMIC: above the
+# overlay, because a punched hole is a transparent rectangle and would put
+# live video behind the mascot's own alpha instead of comic art.
+def vert_browsers() -> list:
+    return [SRC["overlayVertical"]] + ([SRC["mascotVertical"]] if has_mascot() else [])
+
+
+def vert_stack() -> list:
+    return [SRC["game"], SRC["browser"], SRC["cam"], SRC["chat"]] + vert_browsers()
 
 
 # --- encoders --------------------------------------------------------------
@@ -178,23 +252,24 @@ def stack(placeholders: bool):
         # Tts draws nothing and is parked off-canvas (do_tts); it is in COMIC
         # only because a source has to be in the live scene for its audio to
         # reach the mix. Bottom, so it is under everything if it ever drew.
-        ("Tts", "browser_source", None),
-        ("Game", video or ("game_capture" if win else "screen_capture"), 0xFF10DA16),
+        (SRC["tts"], "browser_source", None),
+        (SRC["game"], video or ("game_capture" if win else "screen_capture"), 0xFF10DA16),
         # Directly above Game, whose hole it borrows while it is on air; under
         # Cam, whose window sits inside the game panel. See BROWSER_SOURCE.
-        ("Browser", video or ("window_capture" if win else "screen_capture"), 0xFFE0A030),
-        ("Cam", video or ("dshow_input" if win else "av_capture_input_v2"), 0xFF3C8BDA),
-        ("Chat", video or "browser_source", 0xFFDA2624),
-        ("Overlay", "browser_source", None),
-        ("Deer", "browser_source", None),
-    ]
+        (SRC["browser"], video or ("window_capture" if win else "screen_capture"), 0xFFE0A030),
+        (SRC["cam"], video or ("dshow_input" if win else "av_capture_input_v2"), 0xFF3C8BDA),
+        (SRC["chat"], video or "browser_source", 0xFFDA2624),
+        (SRC["overlay"], "browser_source", None),
+    ] + ([(SRC["mascot"], "browser_source", None)] if has_mascot() else [])
 
 
 # Sources that belong in COMIC. The overlay positions Game, Browser, Cam and
-# Chat through obs-websocket; Deer positions itself, Tts is parked by this
-# script, and Discord is audio only. Anything else in COMIC is a stray as far
-# as this script is concerned.
-MANAGED = {"Game", "Browser", "Cam", "Chat", "Overlay", "Deer", "Tts", "Discord"}
+# Chat through obs-websocket; the mascot, where the overlay has one, positions
+# itself, Tts is parked by this script, and Discord is audio only. Anything
+# else in COMIC is a stray as far as this script is concerned.
+def managed() -> set:
+    names = {SRC[k] for k in ("game", "browser", "cam", "chat", "overlay", "tts", "discord")}
+    return names | ({SRC["mascot"]} if has_mascot() else set())
 
 
 # Chat TTS. The bridge synthesises each line with Piper and the Tts browser
@@ -204,7 +279,7 @@ MANAGED = {"Game", "Browser", "Cam", "Chat", "Overlay", "Deer", "Tts", "Discord"
 # Parked off-canvas like the overlay's unused sources: it is transparent and
 # draws nothing, but nothing else positions it, and a stray rectangle at 0,0
 # would sit inside START's webcam window the day the page grew a debug panel.
-TTS_SOURCE = "Tts"
+TTS_SOURCE = SRC["tts"]
 # Monitor AND output: on stream, and in your ears. The monitor plays from
 # obs64.exe, and every capture left in this setup is of one application (see
 # do_audio), so nothing can pick the monitored line up a second time. That was
@@ -233,7 +308,7 @@ TTS_MONITOR = "OBS_MONITORING_TYPE_MONITOR_AND_OUTPUT"
 # Windows Graphics Capture (method 2), because Chrome draws on the GPU and
 # BitBlt captures it as black. Priority 2 matches the title first and then
 # any window of the same executable, so a tab change never loses it.
-BROWSER_SOURCE = "Browser"
+BROWSER_SOURCE = SRC["browser"]
 BROWSER_SETTINGS = {
     "window": "Google Chrome:Chrome_WidgetWin_1:chrome.exe",
     "priority": 2,
@@ -261,7 +336,7 @@ VERT_PARK = {"positionX": float(VERT_W + 200), "positionY": float(VERT_H + 200)}
 # color_multiply 0 is black, so every pixel multiplies to opaque black. Not
 # opacity 0: that makes the hole transparent and reveals whatever sits below
 # Cam in the stack, which in COMIC is Game.
-CAM_OFF_SOURCE = "Cam"
+CAM_OFF_SOURCE = SRC["cam"]
 CAM_OFF_FILTER = "CAM OFF"
 CAM_OFF_KIND = "color_filter_v2"
 CAM_OFF_SETTINGS = {"color_multiply": 0}
@@ -331,7 +406,7 @@ GRADE_GENERATOR = REPO / "tools/cam-grade.py"
 #
 # Mute is deliberately NOT asserted. It is a live toggle the deck owns, the
 # same way it owns CAM OFF's enabled state.
-GAME_SOURCE = "Game"
+GAME_SOURCE = SRC["game"]
 OUTPUT_CAPTURE_KINDS = ("wasapi_output_capture",)
 
 # Discord: its voice plays from Discord.exe's own process tree, which is what
@@ -339,7 +414,7 @@ OUTPUT_CAPTURE_KINDS = ("wasapi_output_capture",)
 # window of Discord.exe, because the title follows whichever channel is open.
 # It must sit in COMIC like Tts -- a source reaches the mix only from a scene
 # that is on air -- and draws nothing, so nothing positions it.
-DISCORD_SOURCE = "Discord"
+DISCORD_SOURCE = SRC["discord"]
 DISCORD_KIND = "wasapi_process_output_capture"
 DISCORD_SETTINGS = {"window": "Discord:Chrome_WidgetWin_1:Discord.exe", "priority": 2}
 
@@ -552,13 +627,10 @@ VERT_VENDOR = "aitum-vertical-canvas"
 # checkout with CRLF line endings yields the same string OBS already holds.
 # Read when needed rather than at import: --clip and --go-live are deck
 # buttons, and a missing stylesheet must not stop a stream starting.
-CHAT_CSS_FILE = OVERLAY_DIR / "chat.css"
-
-
 def chat_css():
     """The overlay's chat.css, or None if it is missing (preflight says so)."""
     try:
-        return CHAT_CSS_FILE.read_text(encoding="utf-8")
+        return (OVERLAY_DIR / "chat.css").read_text(encoding="utf-8")
     except OSError:
         return None
 
@@ -761,7 +833,6 @@ def discover_password() -> str:
 # export
 
 
-EXPORT_DEFAULT = OVERLAY_DIR / "obs" / "scenes.json"
 
 # Query parameters and settings keys that carry a credential. Scrubbed by name
 # rather than by value, so this never has to know what the secret actually is.
@@ -854,8 +925,10 @@ def scrub(node):
     return node
 
 
-def live_shape(a):
-    """The COMIC stack as OBS has it *right now*, or None if OBS is not up.
+def live_shape(a, collection: str):
+    """The COMIC stack as OBS has it *right now*, or None if OBS is not up --
+    or is on another collection, whose file OBS wrote when it switched away
+    and which is therefore current.
 
     Only used to catch a stale file. Export itself needs no websocket.
     """
@@ -864,6 +937,9 @@ def live_shape(a):
     except Exception:
         return None
     try:
+        active = obs.req("GetSceneCollectionList")["currentSceneCollectionName"]
+        if active != collection:
+            return None
         scenes = {x["sceneName"] for x in obs.req("GetSceneList")["scenes"]}
         # Every canvas, not just Main. One scene collection file holds the
         # scenes of all of them -- a vertical canvas is a native libobs canvas,
@@ -901,8 +977,9 @@ def file_shape(doc):
 
 
 def do_export(a) -> None:
-    src = Path(a.export_from) if a.export_from else collection_path(a.collection)
-    out = Path(a.out) if a.out else EXPORT_DEFAULT
+    collection = a.collection or OVERLAY_CFG["collection"]
+    src = Path(a.export_from) if a.export_from else collection_path(collection)
+    out = Path(a.out) if a.out else OVERLAY_DIR / "obs" / "scenes.json"
 
     raw = json.loads(src.read_text())
     age = time.time() - src.stat().st_mtime
@@ -913,7 +990,7 @@ def do_export(a) -> None:
     # ships the setup you already fixed. Compare against the live scene graph
     # and refuse rather than warn.
     if not a.export_from:
-        live = live_shape(a)
+        live = live_shape(a, collection)
         if live and live != file_shape(raw):
             ls, lstack = live
             fs, fstack = file_shape(raw)
@@ -940,7 +1017,7 @@ def do_export(a) -> None:
     # OBS names the imported collection after this field, and "Untitled" is a
     # poor thing to hand someone. Landing on START also beats importing into
     # whatever scene happened to be live when the file was written.
-    clean["name"] = a.name
+    clean["name"] = a.name or OVERLAY_CFG["collection"]
     if HOST_SCENE in [x.get("name") for x in clean.get("sources", [])]:
         clean["current_scene"] = "START"
         clean["current_program_scene"] = "START"
@@ -963,7 +1040,7 @@ def do_export(a) -> None:
         {i["name"] for s2 in clean.get("sources", [])
          if s2.get("id") == "scene" and s2.get("name") == HOST_SCENE
          for i in s2.get("settings", {}).get("items", [])}
-        - MANAGED
+        - managed()
     )
 
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -1012,7 +1089,7 @@ class Plan:
 
 
 def browser_settings(name: str, pw: str) -> dict:
-    if name == "Overlay":
+    if name == SRC["overlay"]:
         # file:// on purpose: the overlay must keep working when the mascot
         # bridge is not running. See README, "Why the overlay is file:// and
         # the mascot is http://".
@@ -1027,11 +1104,13 @@ def browser_settings(name: str, pw: str) -> dict:
             "restart_when_active": False,
             "reroute_audio": True,      # alert audio rides the browser source
         }
-    if name == "Deer":
+    if name == SRC["mascot"]:
+        if not has_mascot():
+            return {}
         # The bridge serves the repo root; `overlay` tells mascot.html whose
         # placement file to read, since a set is shared and placement is not.
-        url = ("http://127.0.0.1:%d/mascot/mascot.html?set=deer&overlay=%s"
-               % (MASCOT_PORT, OVERLAY))
+        url = ("http://127.0.0.1:%d/mascot/mascot.html?set=%s&overlay=%s"
+               % (MASCOT_PORT, OVERLAY_CFG["mascot"]["set"], OVERLAY))
         if pw:
             url += "&pw=" + urllib.parse.quote(pw)
         return {
@@ -1042,7 +1121,7 @@ def browser_settings(name: str, pw: str) -> dict:
             "restart_when_active": False,
             "reroute_audio": False,
         }
-    if name == "OverlayV":
+    if name == SRC["overlayVertical"]:
         # Same file:// reasoning as Overlay.
         #
         # reroute_audio stays FALSE. Alert audio rides the horizontal Overlay
@@ -1059,12 +1138,15 @@ def browser_settings(name: str, pw: str) -> dict:
             "restart_when_active": False,
             "reroute_audio": False,
         }
-    if name == "DeerV":
-        # The vertical twin of Deer. Same bridge, same sprite set, different
-        # placement file -- mascot.html needed no changes, because it already
-        # takes `place` and sizes itself from innerWidth/innerHeight.
-        url = ("http://127.0.0.1:%d/mascot/mascot.html?set=deer&overlay=%s"
-               "&place=placement-vertical.json" % (MASCOT_PORT, OVERLAY))
+    if name == SRC["mascotVertical"]:
+        if not has_mascot():
+            return {}
+        # The vertical twin of the mascot. Same bridge, same sprite set,
+        # different placement file -- mascot.html needed no changes, because it
+        # already takes `place` and sizes itself from innerWidth/innerHeight.
+        url = ("http://127.0.0.1:%d/mascot/mascot.html?set=%s&overlay=%s"
+               "&place=placement-vertical.json"
+               % (MASCOT_PORT, OVERLAY_CFG["mascot"]["set"], OVERLAY))
         if pw:
             url += "&pw=" + urllib.parse.quote(pw)
         return {
@@ -1075,7 +1157,7 @@ def browser_settings(name: str, pw: str) -> dict:
             "restart_when_active": False,
             "reroute_audio": False,
         }
-    if name == "Tts":
+    if name == SRC["tts"]:
         # file://, like Overlay, and for a sharper reason: a browser source
         # never retries a page that failed to load, so served by a bridge that
         # was not up yet it stayed blank until refreshed -- measured, the first
@@ -1090,7 +1172,7 @@ def browser_settings(name: str, pw: str) -> dict:
             "restart_when_active": False,
             "reroute_audio": True,
         }
-    if name == "Chat":
+    if name == SRC["chat"]:
         # 800x938 is the chat hole's own aspect (2174 x 2550 page px). The
         # source is cropped to that aspect before it is stretched, so any
         # other shape throws away chat rather than letterboxing it.
@@ -1116,6 +1198,15 @@ def main() -> None:
     ap.add_argument("--port", type=int, default=4455)
     ap.add_argument("--password", default=os.environ.get("OBS_WS_PASSWORD", ""),
                     help="defaults to $OBS_WS_PASSWORD, then OBS's own config file")
+    ap.add_argument("--overlay", default="", metavar="NAME",
+                    help="which overlays/NAME to build. Its overlay.json names "
+                         "the scene collection, which is switched to -- or "
+                         "created -- first, never while live. Default: the "
+                         "overlay whose collection is active")
+    ap.add_argument("--no-profiles", dest="no_profiles", action="store_true",
+                    help="build the scene collection only, and leave every "
+                         "profile's canvas, delay, replay buffer and encoder "
+                         "alone. Profiles are independent of overlays")
     ap.add_argument("--check", action="store_true",
                     help="report what would change and exit non-zero if anything would")
     ap.add_argument("--placeholders", action="store_true",
@@ -1153,26 +1244,32 @@ def main() -> None:
                          "plugin and a canvas added in its dock." % VERT_SCENE)
     ap.add_argument("--export", action="store_true",
                     help="write a sanitised copy of the scene collection to "
-                         "overlays/%s/obs/scenes.json and exit. Strips "
+                         "overlays/<NAME>/obs/scenes.json and exit. Strips "
                          "credentials and machine paths, so the result is safe "
-                         "to commit" % OVERLAY)
+                         "to commit")
     ap.add_argument("--out", default="",
                     help="--export: where to write (default "
-                         "overlays/%s/obs/scenes.json)" % OVERLAY)
+                         "overlays/<NAME>/obs/scenes.json)")
     ap.add_argument("--export-from", dest="export_from", default="",
                     help="--export: sanitise this file instead of OBS's live one, "
                          "e.g. something you made with Scene Collection -> Export")
     ap.add_argument("--collection", default="",
                     help="--export: which collection, if you have more than one")
-    ap.add_argument("--name", default="Comic Overlay",
+    ap.add_argument("--name", default="",
                     help="--export: the name OBS will show for the imported "
-                         "collection (default: Comic Overlay)")
+                         "collection (default: the overlay's collection name)")
     a = ap.parse_args()
 
     # Export reads a file. It deliberately does not need OBS running, or the
     # websocket, or a password -- you may well be exporting after quitting OBS
     # to force it to write the collection out.
     if a.export:
+        overlays = list_overlays()
+        real = [n for n in overlays if not n.startswith("_")]
+        if not a.overlay and len(real) != 1:
+            raise SystemExit("error: name the overlay to export with --overlay: %s"
+                             % ", ".join(sorted(overlays)))
+        select_overlay(a.overlay or real[0], overlays)
         return do_export(a)
 
     pw = a.password or discover_password()
@@ -1192,6 +1289,34 @@ def main() -> None:
         rc = do_clip(obs) if a.clip else do_go_live(obs)
         obs.ws.close()
         raise SystemExit(rc)
+
+    # --- which overlay, in which collection ----------------------------------
+    # One scene collection per overlay (docs/adr/0003). Switching or creating
+    # one reloads every source, so never while anything is live -- and never
+    # in --check, which has nothing to check until the switch has happened.
+    overlays = list_overlays()
+    cl = obs.req("GetSceneCollectionList")
+    active = cl["currentSceneCollectionName"]
+    select_overlay(a.overlay or overlay_for_collection(active, overlays), overlays)
+    want_coll = OVERLAY_CFG["collection"]
+    if want_coll != active:
+        verb = "switch to" if want_coll in cl["sceneCollections"] else "create"
+        if a.check:
+            print("would %s scene collection %r for overlay %s (active: %r) -- "
+                  "nothing to check until it is the active one"
+                  % (verb, want_coll, OVERLAY, active))
+            obs.ws.close()
+            raise SystemExit(1)
+        live = outputs_live(obs)
+        if live:
+            raise SystemExit(
+                "error: %s is running, and changing scene collection reloads "
+                "every source. Re-run once it stops." % " and ".join(live))
+        obs.req("SetCurrentSceneCollection" if verb == "switch to"
+                else "CreateSceneCollection", {"sceneCollectionName": want_coll})
+        print("%s scene collection %r for overlay %s (was %r)"
+              % ("switched to" if verb == "switch to" else "created",
+                 want_coll, OVERLAY, active))
 
     plan = Plan(a.check)
     layout = stack(a.placeholders)
@@ -1214,6 +1339,22 @@ def main() -> None:
     # --- inputs ------------------------------------------------------------
     inputs = {i["inputName"]: i["inputKind"] for i in obs.req("GetInputList")["inputs"]}
     kinds = set(obs.req("GetInputKindList")["inputKinds"])
+
+    # Older names first: renamed in place, so nothing below sees a missing
+    # source and makes a second one beside it (docs/adr/0005). Only a mascot
+    # the overlay keeps is renamed; one it does not have is a stray either way.
+    for old, new in LEGACY_INPUTS.items():
+        if old in inputs and new not in inputs and has_mascot():
+            plan.do("rename input %s -> %s" % (old, new),
+                    lambda o=old, n=new: obs.req(
+                        "SetInputName", {"inputName": o, "newInputName": n}))
+            if not a.check:
+                inputs[new] = inputs.pop(old)
+    if a.check and any(x.startswith("rename input") for x in plan.actions):
+        # Everything below looks the new names up; until the rename has
+        # happened they are not there, and checking would report noise.
+        report(plan, a)
+        return
 
     for name, kind, colour in layout:
         if name in inputs:
@@ -1254,11 +1395,11 @@ def main() -> None:
     # Browser settings are asserted every run: a wrong url, or "Shutdown source
     # when not visible" left ticked, breaks the overlay in ways that look like
     # an overlay bug.
-    for name in ("Overlay", "Deer", "Chat", TTS_SOURCE):
+    for name in (SRC["overlay"], SRC["mascot"], SRC["chat"], TTS_SOURCE):
         want = browser_settings(name, pw)
         if not want or inputs.get(name) != "browser_source":
             continue
-        if name == "Chat":
+        if name == SRC["chat"]:
             # Everything but the url, which is yours -- your channel, your
             # widget provider. The rest is derived from the hole.
             want = {k: want[k] for k in
@@ -1295,7 +1436,7 @@ def main() -> None:
                 ),
             )
 
-    strays = sorted(set(by_name) - MANAGED)
+    strays = sorted(set(by_name) - managed())
     for name in strays:
         if a.prune:
             plan.do(
@@ -1424,8 +1565,10 @@ def main() -> None:
 
     # --- profiles ----------------------------------------------------------
     # Canvas, delay, replay buffer and encoder, in every profile. Last, because
-    # visiting a profile resets video and rebuilds every output.
-    do_profiles(obs, plan, a)
+    # visiting a profile resets video and rebuilds every output. Skipped with
+    # --no-profiles: a profile is a Restream setup, not part of an overlay.
+    if not a.no_profiles:
+        do_profiles(obs, plan, a)
 
     report(plan, a)
     obs.ws.close()
@@ -2522,7 +2665,7 @@ def do_vertical(obs, plan: Plan, a, pw: str) -> None:
     # --- OverlayV ----------------------------------------------------------
     inputs = {i["inputName"]: i["inputKind"] for i in obs.req("GetInputList")["inputs"]}
     made = False
-    for vname in ("OverlayV", "DeerV"):
+    for vname in vert_browsers():
         if vname not in inputs:
             plan.do(
                 "create input %s (browser_source)" % vname,
@@ -2549,7 +2692,7 @@ def do_vertical(obs, plan: Plan, a, pw: str) -> None:
     # Asserted every run, same as Overlay: a stale url, or "Shutdown source when
     # not visible" left ticked, breaks the vertical overlay in ways that look
     # like an overlay bug.
-    for vname in ("OverlayV", "DeerV"):
+    for vname in vert_browsers():
         if inputs.get(vname) != "browser_source":
             continue
         want = browser_settings(vname, pw)
@@ -2578,7 +2721,7 @@ def do_vertical(obs, plan: Plan, a, pw: str) -> None:
                                           "sceneItemId": made["sceneItemId"],
                                           "sceneItemTransform": VERT_PARK})
 
-    for name in VERT_STACK:
+    for name in vert_stack():
         if name not in by_name and name in inputs:
             plan.do(
                 "add %s to %s" % (name, VERT_SCENE),
@@ -2588,7 +2731,7 @@ def do_vertical(obs, plan: Plan, a, pw: str) -> None:
                     {"sceneUuid": su, "sourceName": n, "sceneItemEnabled": True})),
             )
 
-    strays = sorted(set(by_name) - VERT_MANAGED)
+    strays = sorted(set(by_name) - set(vert_stack()))
     for name in strays:
         if a.prune:
             plan.do(
@@ -2603,10 +2746,10 @@ def do_vertical(obs, plan: Plan, a, pw: str) -> None:
                 "overlap. Re-run with --prune to remove it." % (name, VERT_SCENE)
             )
 
-    if not a.check or all(n in by_name for n in VERT_STACK):
+    if not a.check or all(n in by_name for n in vert_stack()):
         items = obs.req("GetSceneItemList", {"sceneUuid": su})["sceneItems"]
         by_name = {i["sourceName"]: i for i in items}
-        want_order = [n for n in VERT_STACK if n in by_name]
+        want_order = [n for n in vert_stack() if n in by_name]
         have_order = [i["sourceName"] for i in
                       sorted(items, key=lambda i: i["sceneItemIndex"])
                       if i["sourceName"] in want_order]
@@ -2630,13 +2773,14 @@ def do_vertical(obs, plan: Plan, a, pw: str) -> None:
     # and none of the plugin's 14 hotkeys switches a scene. So this is reported
     # from the one thing that IS observable -- whether OverlayV has activated.
     # Renaming rather than creating the scene normally makes it moot.
-    if not obs.req("GetSourceActive", {"sourceName": "OverlayV"})["videoActive"]:
+    if not obs.req("GetSourceActive",
+                   {"sourceName": SRC["overlayVertical"]})["videoActive"]:
         plan.warn(
-            "OverlayV is not active, which means %s is not on air on the "
+            "%s is not active, which means %s is not on air on the "
             "vertical canvas -- so the vertical overlay is not running at all. "
             "Select %s in the Aitum Vertical dock. This is the one step no "
             "request, vendor or hotkey can perform."
-            % (VERT_SCENE, VERT_SCENE)
+            % (SRC["overlayVertical"], VERT_SCENE, VERT_SCENE)
         )
 
 
@@ -2862,8 +3006,11 @@ def preflight(plan: Plan) -> None:
     # Both bridges serve the page their source loads, so a missing bridge is not
     # a degraded source -- it is an empty one until the bridge comes up. Both
     # pages retry, so starting the bridges late heals without touching OBS.
-    for port, what in ((MASCOT_PORT, "the Deer source has no sprite sheet to load"),
-                       (TTS_PORT, "the Tts source has no page, and chat is not read")):
+    bridges = [(TTS_PORT, "the Tts source has no page, and chat is not read")]
+    if has_mascot():
+        bridges.insert(0, (MASCOT_PORT, "the %s source has no sprite sheet to load"
+                           % SRC["mascot"]))
+    for port, what in bridges:
         sock = socket.socket()
         sock.settimeout(0.4)
         try:
@@ -2875,11 +3022,14 @@ def preflight(plan: Plan) -> None:
             sock.close()
 
     here = "overlays/%s/" % OVERLAY
-    for rel in ("mascot/mascot.html", "mascot/sets/deer/manifest.json",
-                here + "mascot/placement.json",
-                here + "mascot/placement-vertical.json",
-                here + "overlay.html", here + "vertical.html", here + "chat.css",
-                "chat/tts.html", "chat/chat-bridge.py", "start.py"):
+    files = [here + "overlay.html", here + "vertical.html", here + "chat.css",
+             "chat/tts.html", "chat/chat-bridge.py", "start.py"]
+    if has_mascot():
+        files += ["mascot/mascot.html",
+                  "mascot/sets/%s/manifest.json" % OVERLAY_CFG["mascot"]["set"],
+                  here + "mascot/placement.json",
+                  here + "mascot/placement-vertical.json"]
+    for rel in files:
         if not (REPO / rel).exists():
             plan.warn("%s is missing from the repo" % rel)
 
@@ -2891,14 +3041,17 @@ def preflight(plan: Plan) -> None:
                   "Until then the chat bridge will not start.")
 
     # The sheet the manifest names, whatever it is called.
+    if not has_mascot():
+        return
+    sets = "mascot/sets/%s" % OVERLAY_CFG["mascot"]["set"]
     try:
-        man = json.loads((REPO / "mascot/sets/deer/manifest.json").read_text())
-        sheet = REPO / "mascot/sets/deer" / man.get("sheet", "")
+        man = json.loads((REPO / sets / "manifest.json").read_text())
+        sheet = REPO / sets / man.get("sheet", "")
         if not sheet.exists():
             plan.warn(
-                "mascot/sets/deer/manifest.json names %r but that file is not there. "
+                "%s/manifest.json names %r but that file is not there. "
                 "It is gitignored if it is sheet.png -- only the webp ships."
-                % man.get("sheet")
+                % (sets, man.get("sheet"))
             )
     except Exception:
         pass

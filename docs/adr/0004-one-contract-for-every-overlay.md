@@ -1,8 +1,7 @@
 # 0004 — One set of scene and source names for every overlay
 
 - **Date:** 2026-11-01
-- **Status:** Accepted, not built (written down once in `core/contract.js`,
-  step 6n)
+- **Status:** Accepted, built 2026-11-01 — `core/contract.js`, read by the pages, `obs-setup.py` and `start.py`
 
 ## Context
 

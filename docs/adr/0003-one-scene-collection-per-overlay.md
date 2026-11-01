@@ -1,7 +1,7 @@
 # 0003 — One scene collection per overlay; profiles stay per Restream setup
 
 - **Date:** 2026-11-01
-- **Status:** Accepted, not built (step 6o in `CLAUDE.md` §7)
+- **Status:** Accepted, built 2026-11-01 — see [0010](0010-building-and-choosing-an-overlays-collection.md); the live collection is renamed there
 
 ## Context
 

@@ -13,8 +13,8 @@ window.OVERLAY_CONTRACT = {
     "chat": "Chat",
     "overlay": "Overlay",
     "overlayVertical": "OverlayV",
-    "mascot": "Deer",
-    "mascotVertical": "DeerV",
+    "mascot": "Mascot",
+    "mascotVertical": "MascotV",
     "tts": "Tts",
     "discord": "Discord"
   },

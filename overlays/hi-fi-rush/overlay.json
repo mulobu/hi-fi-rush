@@ -1,0 +1,13 @@
+{
+  "_comment": [
+    "What tools/obs-setup.py and start.py need to know about this overlay.",
+    "collection: the OBS scene collection it lives in, one per overlay",
+    "  (docs/adr/0003). --overlay switches to it, or creates it.",
+    "mascot: the shared sprite set in mascot/sets/ this overlay shows, placed",
+    "  by mascot/placement*.json here. Leave the key out for no mascot",
+    "  (docs/adr/0005)."
+  ],
+  "name": "Hi-Fi Rush",
+  "collection": "Hi-Fi Rush",
+  "mascot": { "set": "deer" }
+}

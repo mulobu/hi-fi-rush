@@ -43,6 +43,26 @@
         hud(`${via}: ${name} → panel ${id}${first ? " (seed)" : ""}`);
       }
 
+      /* The PAGE hooks for a page on the MAIN canvas (core/README.md): drive
+         COMIC by name. Main's scenes resolve by sceneName, and COMIC is
+         complete and on program from the moment OBS starts, so there is
+         nothing to resolve and nothing to retry. A page's boot script writes
+         `const PAGE = mainPage("name");` -- core/vertical.js has the
+         vertical twin. */
+      function mainPage(label) {
+        const host = OVERLAY_CONTRACT.host.main;
+        return {
+          label,
+          host,
+          hostKey: () => ({ sceneName: host }),
+          onIdentified: () => loadItemIds(),
+          onClosed: () => {},
+          onItemsMissing: () => {},
+          onItemsFailed: () => {},
+          hudState: () => "",
+        };
+      }
+
       /* --- path A: window.obsstudio ------------------------------------ */
       function listenObsStudio() {
         window.addEventListener("obsSceneChanged", (e) =>

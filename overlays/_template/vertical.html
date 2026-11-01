@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Overlay Template — Vertical</title>
+    <!--
+      The vertical canvas's page: 1080 x 1920, driven by the MAIN canvas's
+      program scene, so one deck press moves both pages. Finding the
+      vertical canvas, its scene and the platform safe zones is
+      core/vertical.js; what is here is the design.
+
+      Six 9:16 panels, so `fill` lands every scene square on the frame.
+      Text stays clear of TikTok's 140 top / 324 bottom / 164 right
+      (SAFE_* in core/vertical.js); fitTagsToSafeArea() lifts the tags.
+    -->
+    <style>
+      :root {
+        --ink: #16161d;
+        --paper: #f4f1e8;
+        --gutter: #2a2d3a;
+        --panel: #3b4a9e;
+        --accent: #35d6e8;
+
+        --canvas-w: 1080px;
+        --canvas-h: 1920px;
+        --page-w: 5624px; /* = PAGE_W */
+        --page-h: 6576px; /* = PAGE_H */
+        --page-skirt: 3000px;
+
+        --pan-ms: 900ms;
+        --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+        --f-body: system-ui, "Segoe UI", sans-serif;
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        background: transparent;
+        font-family: var(--f-body);
+        color: var(--paper);
+        overflow: hidden;
+        width: var(--canvas-w);
+        height: var(--canvas-h);
+      }
+      .viewport {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: var(--canvas-w);
+        height: var(--canvas-h);
+        overflow: hidden;
+        background: transparent;
+      }
+      .shaker {
+        position: absolute;
+        inset: 0;
+      }
+      .shaker.shake {
+        animation: settle 160ms ease-out;
+      }
+      @keyframes settle {
+        50% {
+          transform: translate(0, 4px);
+        }
+      }
+      .page {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: var(--page-w);
+        height: var(--page-h);
+        transform-origin: 0 0;
+        transition: transform var(--pan-ms) var(--ease);
+        will-change: transform;
+      }
+      .skirt-n,
+      .skirt-s,
+      .skirt-w,
+      .skirt-e {
+        position: absolute;
+        background: var(--gutter);
+      }
+      .skirt-n,
+      .skirt-s {
+        left: calc(-1 * var(--page-skirt));
+        right: calc(-1 * var(--page-skirt));
+        height: var(--page-skirt);
+      }
+      .skirt-n {
+        top: calc(-1 * var(--page-skirt));
+      }
+      .skirt-s {
+        top: 100%;
+      }
+      .skirt-w,
+      .skirt-e {
+        top: 0;
+        height: var(--page-h);
+        width: var(--page-skirt);
+      }
+      .skirt-w {
+        left: calc(-1 * var(--page-skirt));
+      }
+      .skirt-e {
+        left: 100%;
+      }
+      .page-under {
+        position: absolute;
+        inset: 0;
+        background: var(--gutter);
+      }
+      /* Border stays 15px: PANEL_BORDER in core/panel-page.js. */
+      .panel {
+        position: absolute;
+        overflow: hidden;
+        border: 15px solid var(--ink);
+        border-radius: 28px;
+        background: var(--panel);
+      }
+      .under {
+        position: absolute;
+        inset: 0;
+      }
+      .hole {
+        position: absolute;
+        background: transparent;
+        overflow: hidden;
+        border: 8px solid var(--ink);
+        border-radius: 14px;
+      }
+      .hole.bare {
+        border: 0;
+        border-radius: 0;
+      }
+      .fake-source {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        background: rgba(22, 22, 29, 0.35);
+      }
+      .src-label {
+        font-weight: 800;
+        font-size: 40px;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: rgba(255, 255, 255, 0.5);
+      }
+      .hole.punched .fake-source {
+        display: none;
+      }
+      .panel-tag {
+        position: absolute;
+        left: 32px;
+        bottom: 32px;
+        z-index: 8;
+        padding: 8px 24px;
+        background: var(--ink);
+        color: var(--paper);
+        font-weight: 800;
+        font-size: 60px;
+        letter-spacing: 0.06em;
+        pointer-events: none;
+      }
+      .panel.is-live .panel-tag {
+        box-shadow: 0 0 0 6px var(--accent);
+      }
+      /* Art. Panels land at 0.6x, so page px here are 1.67 canvas px. */
+      .title {
+        position: absolute;
+        left: 8%;
+        top: 8%;
+        font-size: 200px;
+        font-weight: 900;
+        line-height: 0.95;
+      }
+      .countdown {
+        position: absolute;
+        left: 8%;
+        top: 58%;
+        font-size: 170px;
+        font-weight: 800;
+        font-variant-numeric: tabular-nums;
+        color: var(--accent);
+      }
+      .hud {
+        position: absolute;
+        left: 14px;
+        top: 14px;
+        max-width: 1050px;
+        background: rgba(5, 5, 10, 0.93);
+        border: 2px solid var(--accent);
+        padding: 11px 13px;
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 12px;
+        line-height: 1.55;
+        color: var(--accent);
+        z-index: 60;
+        pointer-events: none;
+        white-space: pre;
+      }
+      .hud h4 {
+        font-size: 15px;
+        letter-spacing: 0.14em;
+        margin-bottom: 6px;
+      }
+      .hud .off {
+        color: #4a4a55;
+      }
+      .hud .warn {
+        color: #f5d030;
+      }
+      .hud[hidden] {
+        display: none;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .page {
+          transition-duration: 0.01ms;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="viewport" id="viewport">
+      <div class="shaker" id="shaker"><div class="page" id="page"></div></div>
+    </div>
+
+    <div class="hud" id="hud" hidden>
+      <h4>TEMPLATE VERTICAL DEBUG</h4>
+      <div id="hudState"></div>
+      <div id="hudRects"></div>
+      <div id="hudLog"></div>
+    </div>
+
+    <script src="../../core/contract.js"></script>
+    <script src="../../core/base.js"></script>
+    <script src="../../core/vertical.js"></script>
+    <script>
+      const PAGE_W = 5624,
+        PAGE_H = 6576,
+        CANVAS_W = 1080,
+        CANVAS_H = 1920;
+
+      /* ================================================================
+   PANEL CONFIG — one panel per scene, 1800 x 3200 (9:16), in a 3 x 2
+   grid: margin 64, gutter 48. Holes are % of the 1770 x 3170 content
+   box; a 92%-wide 16:9 window is 28.9% tall.
+   ================================================================ */
+      const PANELS = [
+        {
+          id: 1,
+          key: "start",
+          cls: "p-start",
+          x: 64,
+          y: 64,
+          w: 1800,
+          h: 3200,
+          rot: 0,
+          fit: "fill",
+          tag: "STARTING",
+          holes: [{ src: "Cam", x: 4, y: 26, w: 92, h: 28.9, label: "Cam", c: "#333" }],
+        },
+        {
+          id: 2,
+          key: "chat",
+          cls: "p-chat",
+          x: 1912,
+          y: 64,
+          w: 1800,
+          h: 3200,
+          rot: 0,
+          fit: "fill",
+          tag: "CHAT",
+          holes: [
+            { src: "Cam", x: 4, y: 8, w: 92, h: 28.9, label: "Cam", c: "#333" },
+            { src: "Chat", x: 4, y: 40, w: 92, h: 42, label: "Chat", c: "#333" },
+          ],
+        },
+        {
+          id: 3,
+          key: "game",
+          cls: "p-game",
+          x: 3760,
+          y: 64,
+          w: 1800,
+          h: 3200,
+          rot: 0,
+          fit: "fill",
+          tag: "GAME",
+          /* Face on top, game below: where mobile eyes go. */
+          holes: [
+            { src: "Cam", x: 4, y: 10.04, w: 92, h: 28.9, label: "Cam", c: "#333" },
+            { src: "Game", x: 4, y: 40.43, w: 92, h: 28.9, label: "Game", c: "#222" },
+          ],
+        },
+        {
+          id: 4,
+          key: "cam",
+          cls: "p-cam",
+          x: 64,
+          y: 3312,
+          w: 1800,
+          h: 3200,
+          rot: 0,
+          fit: "fill",
+          tag: "CAM",
+          /* Portrait: the webcam is cropped to it, not letterboxed. */
+          holes: [{ src: "Cam", x: 4, y: 8, w: 92, h: 72, label: "Cam", c: "#333" }],
+        },
+        {
+          id: 5,
+          key: "brb",
+          cls: "p-brb",
+          x: 1912,
+          y: 3312,
+          w: 1800,
+          h: 3200,
+          rot: 0,
+          fit: "fill",
+          tag: "BRB",
+          holes: [],
+        },
+        {
+          id: 6,
+          key: "end",
+          cls: "p-end",
+          x: 3760,
+          y: 3312,
+          w: 1800,
+          h: 3200,
+          rot: 0,
+          fit: "fill",
+          tag: "THE END",
+          holes: [{ src: "Cam", x: 4, y: 40, w: 92, h: 28.9, label: "Cam", c: "#333" }],
+        },
+      ];
+
+      const SCENE_MAP = {
+        START: 1,
+        CHAT: 2,
+        GAME: 3,
+        CAM: 4,
+        BRB: 5,
+        END: 6,
+      };
+
+      function scaleFor(p) {
+        const sx = CANVAS_W / p.w,
+          sy = CANVAS_H / p.h;
+        return p.fit === "fill" ? Math.max(sx, sy) : Math.min(sx, sy) * 0.97;
+      }
+
+      function artFor(p) {
+        switch (p.key) {
+          case "start":
+            return `<div class="title">Starting<br>soon</div>
+              <div class="countdown" id="countdown">05:00</div>`;
+          case "brb":
+            return `<div class="title">Be right<br>back</div>`;
+          case "end":
+            return `<div class="title">Thanks for<br>watching</div>`;
+          default:
+            return "";
+        }
+      }
+    </script>
+    <script src="../../core/socials.js"></script>
+    <script src="../../core/panel-page.js"></script>
+    <script src="../../core/obs-link.js"></script>
+    <script src="../../core/holes.js"></script>
+    <script src="../../core/camera-pan.js"></script>
+    <script src="../../core/hud.js"></script>
+    <script>
+      /* BOOT — after every core file. No obsstudio seed: on the vertical
+         canvas the websocket is the primary path (core/vertical.js). */
+      const PAGE = verticalPage("vertical");
+      if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(fitTagsToSafeArea);
+      } else {
+        fitTagsToSafeArea();
+      }
+      applyPunch(-1);
+      listenObsStudio();
+      connect();
+      startHud();
+    </script>
+  </body>
+</html>
