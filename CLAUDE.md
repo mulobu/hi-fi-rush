@@ -734,10 +734,40 @@ connection received only `connection_info` and heartbeats. A bridge restart
 mid-stream therefore never re-reads old chat — and anything said while it is
 down is lost, not queued.
 
-**YouTube attaches only while a broadcast is live.** Off air its
-`connection_info` is `error: youtube_livechat_ended`; Twitch and Kick report
-`connected` regardless. Whether YouTube attaches by itself when a broadcast
-starts after the bridge, or needs a reconnect, is not yet measured.
+**YouTube attaches only while a broadcast is live — and sometimes not even
+then.** Off air its `connection_info` is `error: youtube_livechat_ended`;
+Twitch and Kick report `connected` regardless. On 2026-10-30 Restream kept
+reporting `youtube_livechat_ended` 22 minutes into a live broadcast with its
+chat open, on fresh connections too, so no reconnect of ours could fix it.
+`YouTubeChat` is the answer: while Restream calls YouTube anything but
+`connected`, the bridge finds every live broadcast on `@thedeepeffect_` — two
+with the vertical output, main and Shorts, each with its own chat, and `/live`
+names only one, so the channel feed is walked too — and polls each one's popout
+chat's **Live chat** view (not Top chat) at the pace YouTube's own answer asks
+for, never longer than 10 s, skipping the backlog the first poll returns. It feeds the same `decide()` path, and
+stops as soon as Restream reports YouTube `connected`, so a line is never read
+from both. Undocumented, like the embed socket. Seen end to end the same
+night: a Shorts chat message was fetched, filtered and spoken (synthesised in
+321 ms, by the bridge's own log). YouTube's timestamp on it read 4 s *after*
+the bridge's, so the two clocks disagree and end-to-end latency is not
+measured. The Shorts chat had been silent all stream until then — three lines
+lost — because Restream never carried it either.
+
+**YouTube rate-limits the address, and the first build asked for it.** At 22:25
+the same night, live, a discovery pass came back `HTTPError 429`; minutes
+later `/live` answered 200, so it was intermittent and not a block. Discovery
+was re-downloading the watch page of every recent video once a minute — up to
+six, each over a megabyte, including broadcasts it was already following —
+which is the likeliest cause, not a measured one. Now a watch page is asked for
+once: never while that video is followed, and never again once it reads as over
+(a real watch page, neither live nor upcoming). Steady state with both chats
+followed is `/live` and the feed each minute, plus the polls, which now go at
+YouTube's `timeoutMs` instead of being capped at 5 s. The limit is per address, so
+one 429 holds every thread: 60 s at first, doubling to 15 min while they keep
+coming, `Retry-After` honoured, and logged once per hold. A follower keeps its
+continuation through the hold instead of refetching the popout page, and skips
+what piled up as stale. Built against a stand-in, 20 checks; restarted into the
+live bridge at 22:30. Not yet seen holding against a real 429.
 
 **There is no deletion signal.** The embed's code has no delete action, so a
 mod removing a message cannot stop it being read. Moderation happens before
@@ -1480,6 +1510,8 @@ Failure modes and guards:
 | Art authored against the full 1080 × 1920 | Tags and type land under the platform UI — invisible, and fine in OBS | `fitTagsToSafeArea()` measures each panel at boot; art held inside `SAFE_RIGHT` |
 | Two conic gradients on one vertical panel | Moiré resolves to a grey wash on a downscaled phone, reading as a paint failure | Only one radial layer on vertical `game` — the static `.burst` |
 | Restream moves the embed socket | TTS goes silent — nothing errors in OBS | The bridge logs every disconnect and retry; the documented API is the fallback, same payloads |
+| Restream stuck on `youtube_livechat_ended` while live | YouTube chat never read, on stream or aloud | `YouTubeChat` polls the channel's live chat directly until Restream reports YouTube connected |
+| YouTube answers the direct read with 429 | YouTube chat silent while it lasts; hammering on makes it last longer | One hold for every thread, 60 s doubling to 15 min; each watch page asked once; polls at YouTube's own pace |
 | Chat socket dies without a close frame | Feed stops silently, the way a sleep or router drop presents | Silence watchdog: no frame in `SILENCE_LIMIT` and the bridge reconnects |
 | Embed token regenerated in Restream | Bridge holds a dead token | Token is re-read from `Chat` on every connect, never stored |
 | A mod deletes a message | It is read aloud anyway | No deletion signal exists — filters and the blocklist run before speech |
@@ -1656,10 +1688,12 @@ Real ceiling is encoder sessions — mix NVENC and QuickSync/x264 across outputs
   vertical canvas.
 - A second 1080×1920 encode is another encoder session. §6 already names
   encoder count as the real ceiling.
-- **Chat TTS has two unmeasured edges, and both need a live stream.** Whether
-  YouTube attaches by itself when a broadcast starts after the bridge, or needs
-  a reconnect; and whether Piper's below-normal thread really yields to a
-  CPU-heavy game — measured only against an idle desktop. Monitoring double
+- **Chat TTS has one unmeasured edge, and it needs a live stream:** whether
+  Piper's below-normal thread really yields to a CPU-heavy game — measured
+  only against an idle desktop. `YouTubeChat` is seen speaking from the Shorts
+  chat; the main chat runs the same code and has not had a message since. The on-stream `Chat` embed reads the
+  same Restream socket, so it misses YouTube in the same state; only TTS is
+  covered. Monitoring double
   capture, the third, is measured and closed (§2).
 - **TTS reaches the vertical stream only if its output carries the main mix.**
   `Tts` is in COMIC alone; whether the vertical plugin's output takes the same

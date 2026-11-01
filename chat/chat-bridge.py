@@ -54,7 +54,9 @@ import sys
 import threading
 import time
 import unicodedata
+import urllib.error
 import urllib.parse
+import urllib.request
 import wave
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -97,6 +99,9 @@ SILENCE_LIMIT = 95.0
 # Twitch/YouTube `thedeepeffect_`, and a YouTube channel name like "The Deep
 # Effect" are all one entry. Same handles as SOCIALS in overlay.html.
 OWN_NAMES = {"thedeepeffect"}
+
+# The channel YouTubeChat reads when Restream cannot. Same handle as SOCIALS.
+YT_HANDLE = "thedeepeffect_"
 
 VOICE = HERE / "voices" / "en_US-lessac-medium.onnx"
 BLOCKLIST = HERE / "blocklist.txt"
@@ -649,9 +654,207 @@ class Handler(BaseHTTPRequestHandler):
 # the feed
 
 
+class Throttled(Exception):
+    """YouTube answered 429; logged once, and every read waits out the hold."""
+
+
+class YouTubeChat:
+    """YouTube live chat read straight from youtube.com, while Restream can't.
+
+    Restream can hold on to a YouTube chat that has ended and keep reporting
+    `youtube_livechat_ended` on every fresh connection, with the broadcast
+    live and its chat open -- seen 2026-10-30, live 22 minutes with YouTube
+    silent. Nothing over Restream's socket fixes that, so while Restream says
+    YouTube is anything but connected, this polls the channel's own live chat
+    the way the popout chat does: the "Live chat" view, every message, not
+    "Top chat". It stops the moment Restream reports YouTube connected, so a
+    line is never read from both. Undocumented like the embed socket: when
+    YouTube moves it, this logs and retries and Restream is no worse off.
+
+    YouTube answers an address that reads too much with 429, and the limit is
+    per address, not per request -- so one 429 holds every read from every
+    thread, a minute at first and doubling to fifteen while they keep coming.
+    """
+
+    UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+          "(KHTML, like Gecko) Chrome/127.0 Safari/537.36")
+    HOLD_MIN, HOLD_MAX = 60.0, 900.0
+
+    def __init__(self, on_line) -> None:
+        self.on_line = on_line
+        self.wanted = threading.Event()
+        self.lock = threading.Lock()
+        self.hold = self.HOLD_MIN
+        self.hold_until = 0.0
+        self.done: set[str] = set()   # videos that can never be live again
+
+    def want(self, on: bool) -> None:
+        if on != self.wanted.is_set():
+            log("YouTube direct read %s" % ("on -- Restream cannot reach it"
+                                            if on else "off -- Restream has it"))
+        (self.wanted.set if on else self.wanted.clear)()
+
+    def _req(self, url: str, body: dict | None = None):
+        while (wait := self.hold_until - time.time()) > 0:
+            time.sleep(wait)
+        h = {"User-Agent": self.UA, "Accept-Language": "en-US,en;q=0.9",
+             "Cookie": "CONSENT=YES+1"}
+        data = None
+        if body is not None:
+            data = json.dumps(body).encode()
+            h["Content-Type"] = "application/json"
+        req = urllib.request.Request(url, data=data, headers=h)
+        try:
+            with urllib.request.urlopen(req, timeout=15) as r:
+                raw = r.read().decode("utf-8", "replace")
+        except urllib.error.HTTPError as e:
+            if e.code != 429:
+                raise
+            with self.lock:
+                # Threads that sent together all get the 429; the first one
+                # back sets the hold, and the rest must not double it again.
+                if self.hold_until <= time.time():
+                    after = e.headers.get("Retry-After", "")
+                    hold = max(self.hold, float(after) if after.isdigit() else 0)
+                    self.hold_until = time.time() + hold
+                    self.hold = min(self.hold * 2, self.HOLD_MAX)
+                    log("YouTube is rate-limiting this address (429) -- "
+                        "holding every read for %ds" % hold)
+            raise Throttled() from None
+        self.hold = self.HOLD_MIN
+        return json.loads(raw) if body is not None else raw
+
+    def _live_videos(self, skip: set[str]) -> list[str]:
+        """Every broadcast live on the channel and not in `skip`.
+
+        With the vertical output that is two -- the main one and the Shorts
+        one, each with its own chat -- and /live names only one of them. So
+        the channel's feed is walked too, asking each recent video whether it
+        is live now. Each answer is a watch page of over a megabyte, so one is
+        never asked twice: not while it is being followed, and never again once
+        it is over. Asking all six every minute is the likeliest reason this
+        address drew a 429 on 2026-10-30.
+        """
+        page = self._req("https://www.youtube.com/@%s/live" % YT_HANDLE)
+        vids = []
+        m = re.search(r'<link rel="canonical" href="https://www\.youtube\.com/'
+                      r'watch\?v=([\w-]{11})"', page)
+        if m and '"isLive":true' in page and m.group(1) not in skip:
+            vids.append(m.group(1))
+        cid = re.search(r'"(?:channelId|externalId)":"(UC[\w-]{22})"', page)
+        if cid:
+            feed = self._req("https://www.youtube.com/feeds/videos.xml"
+                             "?channel_id=" + cid.group(1))
+            for vid in re.findall(r"<yt:videoId>([\w-]{11})<", feed)[:6]:
+                if vid in vids or vid in skip or vid in self.done:
+                    continue
+                watch = self._req("https://www.youtube.com/watch?v=" + vid)
+                if '"isLiveNow":true' in watch:
+                    vids.append(vid)
+                elif '"videoDetails"' in watch and '"isUpcoming":true' not in watch:
+                    # A real watch page, neither live nor scheduled: an ended
+                    # broadcast or an upload. Anything else is asked again.
+                    self.done.add(vid)
+        return vids
+
+    @staticmethod
+    def _line(item: dict) -> dict | None:
+        r = (item.get("liveChatTextMessageRenderer")
+             or item.get("liveChatPaidMessageRenderer"))
+        if not r:
+            return None
+        # Emoji runs carry no text and are dropped anyway when cleaned.
+        text = "".join(run.get("text", "")
+                       for run in (r.get("message") or {}).get("runs", []))
+        name = (r.get("authorName") or {}).get("simpleText", "").lstrip("@")
+        return {"platform": "YouTube", "name": name, "text": text.strip(),
+                "bot": False}
+
+    def _follow(self, vid: str) -> None:
+        page = self._req("https://www.youtube.com/live_chat?is_popout=1&v=" + vid)
+        ver = re.search(r'"INNERTUBE_CLIENT_VERSION":"([^"]+)"', page).group(1)
+        # The view selector's second entry is "Live chat"; the page itself
+        # opens on "Top chat", which YouTube filters.
+        conts = re.findall(r'"reloadContinuationData":\{"continuation":"([^"]+)"',
+                           page)
+        cont = conts[1] if len(conts) > 1 else \
+            re.search(r'"continuation":"([^"]+)"', page).group(1)
+        ctx = {"client": {"clientName": "WEB", "clientVersion": ver, "hl": "en"}}
+        log("YouTube direct read following %s" % vid)
+        first = True
+        while self.wanted.is_set():
+            try:
+                d = self._req("https://www.youtube.com/youtubei/v1/live_chat/"
+                              "get_live_chat?prettyPrint=false",
+                              {"context": ctx, "continuation": cont})
+            except Throttled:
+                # Same continuation once the hold lapses, rather than the
+                # popout page again. A hold is a minute or more, so what piled
+                # up meanwhile is stale: skipped like the backlog.
+                first = True
+                continue
+            lc =(d.get("continuationContents") or {}).get("liveChatContinuation")
+            if not lc:
+                log("YouTube chat %s ended" % vid)
+                return
+            for a in lc.get("actions", []):
+                line = self._line((a.get("addChatItemAction") or {})
+                                  .get("item") or {})
+                # The first answer to a reload is the backlog: already said.
+                if line and not first:
+                    self.on_line(line)
+            first = False
+            c = (lc.get("continuations") or [{}])[0]
+            nxt = (c.get("invalidationContinuationData")
+                   or c.get("timedContinuationData") or {})
+            if not nxt.get("continuation"):
+                return
+            cont = nxt["continuation"]
+            # At the pace YouTube's answer asks for, never ahead of it.
+            time.sleep(min(max(nxt.get("timeoutMs", 5000), 1000), 10000) / 1000)
+
+    def run(self) -> None:
+        # One thread per live broadcast; the channel is re-read every minute
+        # so a broadcast that starts later is picked up too.
+        following: set[str] = set()
+        lock = threading.Lock()
+
+        def follow(vid: str) -> None:
+            try:
+                self._follow(vid)
+            except Throttled:
+                pass                  # _req has said so, once per hold
+            except Exception as e:
+                log("YouTube direct read of %s failed: %r" % (vid, e))
+            with lock:
+                following.discard(vid)
+
+        while True:
+            self.wanted.wait()
+            try:
+                with lock:
+                    skip = set(following)
+                vids = self._live_videos(skip)
+                if not vids and not skip:
+                    log("YouTube direct read: @%s is not live" % YT_HANDLE)
+                for vid in vids:
+                    with lock:
+                        if vid in following:
+                            continue
+                        following.add(vid)
+                    threading.Thread(target=follow, args=(vid,), name="yt-" + vid,
+                                     daemon=True).start()
+            except Throttled:
+                pass
+            except Exception as e:
+                log("YouTube direct read failed: %r" % e)
+            time.sleep(60)
+
+
 class Feed:
-    def __init__(self, raw: bool) -> None:
+    def __init__(self, raw: bool, yt: YouTubeChat) -> None:
         self.raw = raw
+        self.yt = yt
         self.conns: dict[str, int] = {}   # connectionUuid -> eventSourceId
         self.seen_types: set[int] = set()
 
@@ -665,6 +868,8 @@ class Feed:
             why = (": " + p["reason"]) if p.get("reason") else ""
             log("%s %s%s" % (SOURCES.get(src, "source %s" % src),
                              p.get("status"), why))
+            if src == 13:
+                self.yt.want(p.get("status") != "connected")
         elif action == "connection_closed":
             src = self.conns.pop(p.get("connectionUuid"), None)
             log("%s closed" % SOURCES.get(src, "a connection"))
@@ -681,7 +886,24 @@ class Feed:
 
 
 def run(a: argparse.Namespace, reader: Reader, blocklist: Blocklist) -> None:
-    feed = Feed(a.raw)
+    def speak(line: dict) -> None:
+        # Isolated: a message that trips a bug here is one lost line,
+        # not a dropped socket -- and a reconnect replays nothing.
+        try:
+            log("chat %-7s %s%s: %s" % (
+                line["platform"], line["name"],
+                " (bot)" if line["bot"] else "", line["text"]))
+            sentence, why = decide(line, blocklist, a.read_own)
+            if sentence:
+                reader.push(sentence)
+            else:
+                log("  skipped: " + why)
+        except Exception as e:
+            log("  could not handle that line: %r" % e)
+
+    yt = YouTubeChat(speak)
+    threading.Thread(target=yt.run, name="youtube", daemon=True).start()
+    feed = Feed(a.raw, yt)
     token = a.token
     backoff = 1.0
     while True:
@@ -706,21 +928,8 @@ def run(a: argparse.Namespace, reader: Reader, blocklist: Blocklist) -> None:
             log("connected to Restream chat")
             while True:
                 line = feed.handle(ws.recv())
-                if not line:
-                    continue
-                # Isolated: a message that trips a bug here is one lost line,
-                # not a dropped socket -- and a reconnect replays nothing.
-                try:
-                    log("chat %-7s %s%s: %s" % (
-                        line["platform"], line["name"],
-                        " (bot)" if line["bot"] else "", line["text"]))
-                    sentence, why = decide(line, blocklist, a.read_own)
-                    if sentence:
-                        reader.push(sentence)
-                    else:
-                        log("  skipped: " + why)
-                except Exception as e:
-                    log("  could not handle that line: %r" % e)
+                if line:
+                    speak(line)
         except socket.timeout:
             log("no frame for %ds -- reconnecting" % SILENCE_LIMIT)
         except (OSError, ConnectionError, ValueError) as e:
