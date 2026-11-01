@@ -2003,7 +2003,11 @@ def create_browser(obs, kind: str, settings: dict) -> None:
         "inputKind": kind, "inputSettings": settings,
         "sceneItemEnabled": False})
     item = {"sceneName": HOST_SCENE, "sceneItemId": made["sceneItemId"]}
-    obs.req("SetInputMute", {"inputName": BROWSER_SOURCE, "inputMuted": True})
+    # A --placeholders colour block has no audio, and OBS refuses to mute it.
+    # It stays off air all the same: both pages read a mute they cannot get
+    # as muted.
+    if kind != "color_source_v3":
+        obs.req("SetInputMute", {"inputName": BROWSER_SOURCE, "inputMuted": True})
     obs.req("SetSceneItemTransform", dict(item, sceneItemTransform=PARK))
     obs.req("SetSceneItemEnabled", dict(item, sceneItemEnabled=True))
 
@@ -2123,8 +2127,11 @@ def find_mic(obs, plan: Plan):
     ins = [i for i in obs.req("GetInputList")["inputs"]
            if i["inputKind"] in MIC_KINDS]
     if not ins:
-        plan.warn("no audio input capture in this profile, so there is no mic "
-                  "to denoise or duck under -- add one under Settings -> Audio")
+        # The global audio devices live in the scene collection, and a new
+        # one starts with none at all (measured 2026-11-01).
+        plan.warn("no audio input capture in this scene collection, so there is "
+                  "no mic to denoise or duck under -- pick one under Settings -> "
+                  "Audio -> Mic/Auxiliary Audio, then re-run")
         return None
     if len(ins) == 1:
         return ins[0]["inputName"]
@@ -2369,6 +2376,16 @@ def do_mic_dynamics(obs, plan: Plan, mic) -> None:
         cur.insert(want, name)
 
 
+def has_audio(obs, name: str) -> bool:
+    """Whether an input carries audio. GetInputMute is refused for one that
+    does not, which makes it the cheapest way to ask."""
+    try:
+        obs.req("GetInputMute", {"inputName": name})
+        return True
+    except ObsError:
+        return False
+
+
 def do_duck(obs, plan: Plan, mic) -> None:
     """Assert each DUCKS sidechain compressor on its target, keyed as listed.
 
@@ -2381,6 +2398,11 @@ def do_duck(obs, plan: Plan, mic) -> None:
         key = mic if key is MIC_KEY else key
         if key is None or target not in inputs or key not in inputs:
             continue  # find_mic / do_audio / COMIC have already said why
+        if not has_audio(obs, target):
+            # A --placeholders colour block. OBS accepts the filter and keeps
+            # nothing, so without this every run "adds" it again (measured
+            # 2026-11-01, building the template).
+            continue
         filters = obs.req("GetSourceFilterList",
                           {"sourceName": target})["filters"]
         have = next((f for f in filters if f["filterName"] == name), None)
@@ -2438,16 +2460,21 @@ def do_cam_off_filter(obs, plan: Plan) -> None:
         (f for f in filters if f["filterName"] == CAM_OFF_FILTER), None)
 
     if have is None:
-        plan.do(
-            "add %s filter to %s" % (CAM_OFF_FILTER, CAM_OFF_SOURCE),
-            lambda: obs.req("CreateSourceFilter", {
+        # Created, then switched off: CreateSourceFilter has no enabled field
+        # and makes every filter enabled, so a new collection's camera would
+        # start killed to black. Measured 2026-11-01, building the template.
+        # Off is the one time this script decides the state -- at birth.
+        def add():
+            obs.req("CreateSourceFilter", {
                 "sourceName": CAM_OFF_SOURCE,
                 "filterName": CAM_OFF_FILTER,
                 "filterKind": CAM_OFF_KIND,
                 "filterSettings": CAM_OFF_SETTINGS,
-                "filterEnabled": False,
-            }),
-        )
+            })
+            obs.req("SetSourceFilterEnabled", {
+                "sourceName": CAM_OFF_SOURCE, "filterName": CAM_OFF_FILTER,
+                "filterEnabled": False})
+        plan.do("add %s filter to %s, off" % (CAM_OFF_FILTER, CAM_OFF_SOURCE), add)
         return
 
     if have["filterKind"] != CAM_OFF_KIND:

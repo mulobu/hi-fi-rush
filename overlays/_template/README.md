@@ -21,6 +21,11 @@ game-below stack. No mascot.
    py -3 tools/obs-setup.py --overlay <name> --vertical --no-profiles
    ```
 
+   A new collection starts with **no microphone**: pick yours under OBS →
+   Settings → Audio → Mic/Auxiliary Audio, then run the same command again so
+   the mic chain and the ducks go on it. Point `Game`, `Cam` and `Browser` at
+   your hardware as for any machine (root README, step 5).
+
 5. Run the show:
 
    ```bash

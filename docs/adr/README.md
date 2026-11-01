@@ -7,15 +7,15 @@ is — and why it changed.
 | --- | --- | --- | --- |
 | [0001](0001-record-decisions-as-adrs.md) | Record decisions as ADRs | 2026-11-01 | Accepted |
 | [0002](0002-one-repo-for-every-overlay.md) | One repo for every overlay | 2026-11-01 | Accepted, built |
-| [0003](0003-one-scene-collection-per-overlay.md) | One scene collection per overlay; profiles stay per Restream setup | 2026-11-01 | Accepted, built |
+| [0003](0003-one-scene-collection-per-overlay.md) | One scene collection per overlay; profiles stay per Restream setup | 2026-11-01 | Accepted, built, live |
 | [0004](0004-one-contract-for-every-overlay.md) | One set of scene and source names for every overlay | 2026-11-01 | Accepted, built |
-| [0005](0005-mascot-is-optional-and-generic.md) | The mascot is optional, and its sources are `Mascot` / `MascotV` | 2026-11-01 | Accepted, built; live rename pending |
+| [0005](0005-mascot-is-optional-and-generic.md) | The mascot is optional, and its sources are `Mascot` / `MascotV` | 2026-11-01 | Accepted, built, live |
 | [0006](0006-shared-page-code-is-plain-scripts.md) | Shared page code is plain scripts | 2026-11-01 | Accepted, built |
 | [0007](0007-holes-are-each-overlays-design.md) | Holes are each overlay's design; the pipeline's rules are shared | 2026-11-01 | Accepted |
-| [0008](0008-migrate-in-verified-steps.md) | Migrate in verified steps | 2026-11-01 | Accepted; steps 2–3 verified, 4–5 OBS half pending |
+| [0008](0008-migrate-in-verified-steps.md) | Migrate in verified steps | 2026-11-01 | Accepted; steps 1–5 verified |
 | [0009](0009-pages-plug-into-core-through-page-hooks.md) | Pages plug into `core/` through one `PAGE` object | 2026-11-01 | Accepted, built |
-| [0010](0010-building-and-choosing-an-overlays-collection.md) | Building an overlay's collection, and choosing the day's show | 2026-11-01 | Accepted, built; live migration pending |
-| [0011](0011-new-overlays-start-from-the-template.md) | New overlays start from `overlays/_template/` | 2026-11-01 | Accepted, built; not yet in OBS |
+| [0010](0010-building-and-choosing-an-overlays-collection.md) | Building an overlay's collection, and choosing the day's show | 2026-11-01 | Accepted, built, live |
+| [0011](0011-new-overlays-start-from-the-template.md) | New overlays start from `overlays/_template/` | 2026-11-01 | Accepted, built, verified in OBS |
 
 Decisions taken before 2026-11-01 are in the table in `CLAUDE.md` §3, with
 their reasoning in §2. They are not back-filled here.

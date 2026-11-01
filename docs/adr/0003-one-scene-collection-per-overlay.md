@@ -1,7 +1,7 @@
 # 0003 — One scene collection per overlay; profiles stay per Restream setup
 
 - **Date:** 2026-11-01
-- **Status:** Accepted, built 2026-11-01 — see [0010](0010-building-and-choosing-an-overlays-collection.md); the live collection is renamed there
+- **Status:** Accepted, built and live 2026-11-01 — [0010](0010-building-and-choosing-an-overlays-collection.md). The open measurement is answered in `CLAUDE.md` §2, "A fresh collection": it does get a vertical canvas, and it starts with no audio devices at all — no Desktop Audio to disable, but no mic either
 
 ## Context
 

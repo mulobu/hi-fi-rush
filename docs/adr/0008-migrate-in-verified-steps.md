@@ -1,7 +1,7 @@
 # 0008 — Migrate in verified steps
 
 - **Date:** 2026-11-01
-- **Status:** Accepted. Steps 2–3 done and verified 2026-11-01; 4–5 built, their OBS half pending — [0010](0010-building-and-choosing-an-overlays-collection.md), [0011](0011-new-overlays-start-from-the-template.md)
+- **Status:** Accepted. Steps 1–5 done and verified against OBS 2026-11-01 — [0009](0009-pages-plug-into-core-through-page-hooks.md), [0010](0010-building-and-choosing-an-overlays-collection.md), [0011](0011-new-overlays-start-from-the-template.md); the second show's overlay waits for its design
 
 ## Context
 

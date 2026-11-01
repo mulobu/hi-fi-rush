@@ -1,8 +1,9 @@
 # 0011 — New overlays start from `overlays/_template/`
 
 - **Date:** 2026-11-01
-- **Status:** Accepted, built 2026-11-01. Not yet built as a collection in
-  OBS; see Consequences
+- **Status:** Accepted, built 2026-11-01, and verified in OBS as its own
+  collection the same day: twelve punch sets as designed. Building it found
+  three `obs-setup.py` faults, fixed (`CLAUDE.md` §2)
 
 ## Context
 

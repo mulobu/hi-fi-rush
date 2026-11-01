@@ -1013,6 +1013,39 @@ while anything is live: then the others are named, not visited. Shared keys,
 more than one connected profile and differing encoder settings are compared
 from disk, keys hashed and never printed.
 
+**One scene collection per overlay** (ADR 0003, 0010). `--overlay NAME` switches
+to the collection `overlays/NAME/overlay.json` names, or creates it; without it
+the script builds the overlay the active collection belongs to. Never while
+live, never in `--check`. A collection cannot be renamed over the websocket;
+OBS's own Rename named "Hi-Fi Rush" `HiFi_Rush.json` — spaces to `_`, the rest
+of what is not alphanumeric dropped, as with profiles.
+
+**A fresh collection, measured 2026-11-01** (OBS 32.2.2, Restream's vertical
+plugin 1.2.0), straight after `CreateSceneCollection` and again 5 s later:
+
+- **It has a vertical canvas.** `Restream Vertical`, 1080 × 1920, appears at
+  once with one scene, `Vertical Scene`. `--vertical` renames it `VCOMIC`, and
+  `OverlayV` was active with no click in the dock — the renamed scene keeps
+  its uuid and so stays the canvas's current one.
+- **It has no inputs at all.** No Desktop Audio, so nothing to disable; and no
+  Mic/Aux either, so a new collection has **no microphone** until one is
+  picked under Settings → Audio → Mic/Auxiliary Audio. Setup says so, and the
+  mic chain and the ducks keyed off it wait for a re-run after.
+- **Its transition is Fade**; setup makes it Cut.
+- **A round trip is clean.** Hi-Fi Rush → the template → Hi-Fi Rush, the
+  second leg by `start.py --overlay`: twelve punch sets unchanged, `OverlayV`
+  active, the vertical plugin still on `VCOMIC`, the deck connected throughout.
+
+**`CreateSourceFilter` has no enabled field.** It makes every filter enabled
+and ignores `filterEnabled`, so `CAM OFF` — "created off" since it was written —
+was created **on**, and a new collection's camera started black. It never
+showed in Hi-Fi Rush, whose filter predates the deck toggling it. Now it is
+created, then `SetSourceFilterEnabled` false. Found building the template;
+two more `--placeholders`-only faults with it, since a colour block has no
+audio: muting the placeholder `Browser` is refused, and an audio filter on
+it is accepted and not kept, so every run "added" the Discord duck again.
+`has_audio()` asks with `GetInputMute`, which OBS refuses for such an input.
+
 ---
 
 ## 3. Decisions
@@ -1255,12 +1288,11 @@ Real ceiling is encoder sessions — mix NVENC and QuickSync/x264 across outputs
     back unchanged, 2026-11-01 (ADR 0006, 0009)
 6o. ✅ `overlay.json` and `--overlay`: one scene collection per overlay, names
     from `core/contract.js`, the mascot optional and renamed `Mascot` /
-    `MascotV`; `start.py --overlay / --profile` (ADR 0003–0005, 0010).
-    ⬜ Live: collection `Untitled` → `Hi-Fi Rush`, then one setup run renames
-    `Deer` → `Mascot`
-6p. ✅ `overlays/_template/` and `core/vertical.js` (ADR 0011). ⬜ The template
-    built as its own collection — the fresh-collection measurement; the
-    second show's own overlay, once designed
+    `MascotV`; `start.py --overlay / --profile` (ADR 0003–0005, 0010). Live
+    2026-11-01: collection renamed `Hi-Fi Rush`, `Deer` → `Mascot`, re-exported
+6p. ✅ `overlays/_template/` and `core/vertical.js` (ADR 0011), built as its own
+    collection and read back off OBS 2026-11-01; a fresh collection measured
+    (§2). ⬜ The second show's own overlay, once designed
 7. ⬜ Failsafes + panic key
 8. ⬜ Alert layer + queue, Streamer.bot / EventSub feed
 9. ⬜ Self-host fonts, go live
@@ -1396,16 +1428,10 @@ Real ceiling is encoder sessions — mix NVENC and QuickSync/x264 across outputs
   counted and `vod` should be `stream` alone.
 - **Left over from the move to one repo (2026-11-01).**
   - The GitHub repo is still named `hi-fi-rush`.
-  - **The scene collection is still `Untitled`.** Until it is renamed `Hi-Fi
-    Rush` (Scene Collection → Rename), a plain `obs-setup.py` refuses and
-    names `--overlay`, and the `Deer` / `DeerV` sources keep their old names
-    — the pages do not care, `obs-setup.py --check` reports them.
-  - `overlays/hi-fi-rush/obs/scenes.json` still predates 2026-10-25 and needs
-    a re-export after the rename.
-  - **Not measured: a fresh collection.** Whether the vertical plugin gives it
-    a canvas, and which audio devices it starts with. Building the template
-    answers both (ADR 0011).
   - **`shows.json`**, day → overlay + profile, waits for the schedule.
+  - **OBS holds an `Overlay Template` collection**, built by the template test
+    with colour placeholders and no mic. Handy for previewing a new design;
+    Scene Collection → Remove if not.
 
 ---
 

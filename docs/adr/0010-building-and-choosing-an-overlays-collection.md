@@ -1,8 +1,9 @@
 # 0010 — Building an overlay's collection, and choosing the day's show
 
 - **Date:** 2026-11-01
-- **Status:** Accepted, built 2026-11-01. The live migration — `Untitled` →
-  `Hi-Fi Rush`, `Deer` → `Mascot` — is not done yet; see Consequences
+- **Status:** Accepted, built and live 2026-11-01 — collection renamed by
+  hand, then one setup run renamed the mascot; twelve punch sets unchanged,
+  `start.py --overlay` switching verified (`CLAUDE.md` §2)
 
 ## Context
 

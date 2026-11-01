@@ -1,44 +1,13 @@
 {
-  "name": "Comic Overlay",
-  "DesktopAudioDevice1": {
-    "prev_ver": 537001986,
-    "name": "Desktop Audio",
-    "uuid": "a2c0c500-63a8-4e8f-bf97-43cd65f96747",
-    "id": "wasapi_output_capture",
-    "versioned_id": "wasapi_output_capture",
-    "settings": {
-      "device_id": "default"
-    },
-    "mixers": 255,
-    "sync": 0,
-    "flags": 0,
-    "volume": 1.0,
-    "balance": 0.5,
-    "enabled": true,
-    "muted": false,
-    "push-to-mute": false,
-    "push-to-mute-delay": 0,
-    "push-to-talk": false,
-    "push-to-talk-delay": 0,
-    "hotkeys": {
-      "libobs.mute": [],
-      "libobs.unmute": [],
-      "libobs.push-to-mute": [],
-      "libobs.push-to-talk": []
-    },
-    "deinterlace_mode": 0,
-    "deinterlace_field_order": 0,
-    "monitoring_type": 0,
-    "private_settings": {}
-  },
+  "name": "Hi-Fi Rush",
   "AuxAudioDevice1": {
-    "prev_ver": 537001986,
+    "prev_ver": 553648129,
     "name": "Mic/Aux",
     "uuid": "25209093-d735-4a86-b150-c1f8a0ed6113",
     "id": "wasapi_input_capture",
     "versioned_id": "wasapi_input_capture",
     "settings": {
-      "device_id": "{0.0.1.00000000}.{c9702c9a-2b53-4692-8b16-6b3653464c5f}"
+      "device_id": "{0.0.1.00000000}.{651cc1af-8393-4926-92db-31701072cb5a}"
     },
     "mixers": 255,
     "sync": 0,
@@ -54,22 +23,149 @@
     "hotkeys": {
       "libobs.mute": [],
       "libobs.unmute": [],
+      "libobs.monitor-on": [],
+      "libobs.monitor-off": [],
       "libobs.push-to-mute": [],
       "libobs.push-to-talk": []
     },
     "deinterlace_mode": 0,
     "deinterlace_field_order": 0,
     "monitoring_type": 0,
-    "private_settings": {}
+    "monitoring_enabled": false,
+    "private_settings": {},
+    "filters": [
+      {
+        "prev_ver": 553648129,
+        "name": "NV DENOISE",
+        "uuid": "27d05cfb-2d2a-4910-a10f-e311f885f19b",
+        "id": "nvidia_audiofx_filter",
+        "versioned_id": "nvidia_audiofx_filter",
+        "settings": {
+          "intensity": 1.0,
+          "method": "dereverb_denoiser",
+          "vad": true
+        },
+        "mixers": 255,
+        "sync": 0,
+        "flags": 0,
+        "volume": 1.0,
+        "balance": 0.5,
+        "enabled": true,
+        "muted": false,
+        "push-to-mute": false,
+        "push-to-mute-delay": 0,
+        "push-to-talk": false,
+        "push-to-talk-delay": 0,
+        "hotkeys": {},
+        "deinterlace_mode": 0,
+        "deinterlace_field_order": 0,
+        "monitoring_type": 0,
+        "monitoring_enabled": false,
+        "private_settings": {}
+      },
+      {
+        "prev_ver": 553648129,
+        "name": "EQ",
+        "uuid": "19536578-32bd-4b7c-b28f-e28d3f7d4485",
+        "id": "basic_eq_filter",
+        "versioned_id": "basic_eq_filter",
+        "settings": {
+          "low": 0.0,
+          "mid": 0.0,
+          "high": -6.0
+        },
+        "mixers": 255,
+        "sync": 0,
+        "flags": 0,
+        "volume": 1.0,
+        "balance": 0.5,
+        "enabled": true,
+        "muted": false,
+        "push-to-mute": false,
+        "push-to-mute-delay": 0,
+        "push-to-talk": false,
+        "push-to-talk-delay": 0,
+        "hotkeys": {},
+        "deinterlace_mode": 0,
+        "deinterlace_field_order": 0,
+        "monitoring_type": 0,
+        "monitoring_enabled": false,
+        "private_settings": {}
+      },
+      {
+        "prev_ver": 553648129,
+        "name": "COMPRESS",
+        "uuid": "846b865a-a55d-42f1-8420-e87461f4398f",
+        "id": "compressor_filter",
+        "versioned_id": "compressor_filter",
+        "settings": {
+          "ratio": 3.0,
+          "threshold": -18.0,
+          "attack_time": 6,
+          "release_time": 60,
+          "output_gain": 4.0,
+          "sidechain_source": "none"
+        },
+        "mixers": 255,
+        "sync": 0,
+        "flags": 0,
+        "volume": 1.0,
+        "balance": 0.5,
+        "enabled": true,
+        "muted": false,
+        "push-to-mute": false,
+        "push-to-mute-delay": 0,
+        "push-to-talk": false,
+        "push-to-talk-delay": 0,
+        "hotkeys": {},
+        "deinterlace_mode": 0,
+        "deinterlace_field_order": 0,
+        "monitoring_type": 0,
+        "monitoring_enabled": false,
+        "private_settings": {}
+      },
+      {
+        "prev_ver": 553648129,
+        "name": "LIMIT",
+        "uuid": "3ea6d0b4-036a-4e95-a69b-c7979fe75c6c",
+        "id": "limiter_filter",
+        "versioned_id": "limiter_filter",
+        "settings": {
+          "threshold": -3.0,
+          "release_time": 60
+        },
+        "mixers": 255,
+        "sync": 0,
+        "flags": 0,
+        "volume": 1.0,
+        "balance": 0.5,
+        "enabled": true,
+        "muted": false,
+        "push-to-mute": false,
+        "push-to-mute-delay": 0,
+        "push-to-talk": false,
+        "push-to-talk-delay": 0,
+        "hotkeys": {},
+        "deinterlace_mode": 0,
+        "deinterlace_field_order": 0,
+        "monitoring_type": 0,
+        "monitoring_enabled": false,
+        "private_settings": {}
+      }
+    ]
   },
   "sources": [
     {
-      "prev_ver": 537001986,
+      "prev_ver": 553648129,
       "name": "Game",
       "uuid": "77ec0feb-72a7-4fdf-8feb-06789258e89c",
       "id": "game_capture",
       "versioned_id": "game_capture",
-      "settings": {},
+      "settings": {
+        "capture_audio": true,
+        "window": "VALORANT  :VALORANTUnrealWindow:VALORANT-Win64-Shipping.exe",
+        "capture_mode": "window"
+      },
       "mixers": 255,
       "sync": 0,
       "flags": 0,
@@ -84,6 +180,8 @@
       "hotkeys": {
         "libobs.mute": [],
         "libobs.unmute": [],
+        "libobs.monitor-on": [],
+        "libobs.monitor-off": [],
         "libobs.push-to-mute": [],
         "libobs.push-to-talk": [],
         "hotkey_start": [],
@@ -92,52 +190,83 @@
       "deinterlace_mode": 0,
       "deinterlace_field_order": 0,
       "monitoring_type": 0,
-      "private_settings": {}
+      "monitoring_enabled": false,
+      "private_settings": {},
+      "filters": [
+        {
+          "prev_ver": 553648129,
+          "name": "DUCK",
+          "uuid": "176b95fd-d0cb-4742-a875-17827cbf86b0",
+          "id": "compressor_filter",
+          "versioned_id": "compressor_filter",
+          "settings": {
+            "ratio": 3.0,
+            "threshold": -38.0,
+            "attack_time": 50,
+            "release_time": 1000,
+            "output_gain": 0.0,
+            "sidechain_source": "Mic/Aux"
+          },
+          "mixers": 255,
+          "sync": 0,
+          "flags": 0,
+          "volume": 1.0,
+          "balance": 0.5,
+          "enabled": true,
+          "muted": false,
+          "push-to-mute": false,
+          "push-to-mute-delay": 0,
+          "push-to-talk": false,
+          "push-to-talk-delay": 0,
+          "hotkeys": {},
+          "deinterlace_mode": 0,
+          "deinterlace_field_order": 0,
+          "monitoring_type": 0,
+          "monitoring_enabled": false,
+          "private_settings": {}
+        },
+        {
+          "prev_ver": 553648129,
+          "name": "DUCK DISCORD",
+          "uuid": "00417bff-6f96-4128-8ea6-ca63ef4f1ead",
+          "id": "compressor_filter",
+          "versioned_id": "compressor_filter",
+          "settings": {
+            "ratio": 3.0,
+            "threshold": -24.0,
+            "attack_time": 10,
+            "release_time": 600,
+            "output_gain": 0.0,
+            "sidechain_source": "Discord"
+          },
+          "mixers": 255,
+          "sync": 0,
+          "flags": 0,
+          "volume": 1.0,
+          "balance": 0.5,
+          "enabled": true,
+          "muted": false,
+          "push-to-mute": false,
+          "push-to-mute-delay": 0,
+          "push-to-talk": false,
+          "push-to-talk-delay": 0,
+          "hotkeys": {},
+          "deinterlace_mode": 0,
+          "deinterlace_field_order": 0,
+          "monitoring_type": 0,
+          "monitoring_enabled": false,
+          "private_settings": {}
+        }
+      ]
     },
     {
-      "prev_ver": 537001986,
-      "name": "Cam",
-      "uuid": "c6e08561-868b-4394-b006-60cc98dfb735",
-      "id": "dshow_input",
-      "versioned_id": "dshow_input",
-      "settings": {
-        "video_device_id": "Logi C270 HD WebCam:\\\\?\\usb#22vid_046d&pid_0825&mi_00#228&2641cb4f&0&0000#22{65e8773d-8f56-11d0-a3b9-00a0c9223196}\\global",
-        "last_video_device_id": "Logi C270 HD WebCam:\\\\?\\usb#22vid_046d&pid_0825&mi_00#228&2641cb4f&0&0000#22{65e8773d-8f56-11d0-a3b9-00a0c9223196}\\global",
-        "resolution": "1280x720",
-        "frame_interval": 0,
-        "res_type": 1,
-        "video_format": 0
-      },
-      "mixers": 255,
-      "sync": 0,
-      "flags": 0,
-      "volume": 1.0,
-      "balance": 0.5,
-      "enabled": true,
-      "muted": false,
-      "push-to-mute": false,
-      "push-to-mute-delay": 0,
-      "push-to-talk": false,
-      "push-to-talk-delay": 0,
-      "hotkeys": {
-        "libobs.mute": [],
-        "libobs.unmute": [],
-        "libobs.push-to-mute": [],
-        "libobs.push-to-talk": []
-      },
-      "deinterlace_mode": 0,
-      "deinterlace_field_order": 0,
-      "monitoring_type": 0,
-      "private_settings": {}
-    },
-    {
-      "prev_ver": 537001986,
+      "prev_ver": 553648129,
       "name": "Chat",
       "uuid": "fadb0e71-cdbe-4de7-b394-9ec39d415500",
       "id": "browser_source",
       "versioned_id": "browser_source",
       "settings": {
-        "url": "about:blank",
+        "url": "https://chat.restream.io/embed",
         "width": 800,
         "height": 938,
         "shutdown": false,
@@ -158,6 +287,8 @@
       "hotkeys": {
         "libobs.mute": [],
         "libobs.unmute": [],
+        "libobs.monitor-on": [],
+        "libobs.monitor-off": [],
         "libobs.push-to-mute": [],
         "libobs.push-to-talk": [],
         "ObsBrowser.Refresh": []
@@ -165,16 +296,17 @@
       "deinterlace_mode": 0,
       "deinterlace_field_order": 0,
       "monitoring_type": 0,
+      "monitoring_enabled": false,
       "private_settings": {}
     },
     {
-      "prev_ver": 537001986,
+      "prev_ver": 553648129,
       "name": "Overlay",
       "uuid": "68e596dd-1264-4a17-8e0f-73e1b309e808",
       "id": "browser_source",
       "versioned_id": "browser_source",
       "settings": {
-        "url": "{{REPO}}/overlay.html",
+        "url": "{{REPO}}/overlays/hi-fi-rush/overlay.html",
         "width": 1920,
         "height": 1080,
         "shutdown": false,
@@ -195,6 +327,8 @@
       "hotkeys": {
         "libobs.mute": [],
         "libobs.unmute": [],
+        "libobs.monitor-on": [],
+        "libobs.monitor-off": [],
         "libobs.push-to-mute": [],
         "libobs.push-to-talk": [],
         "ObsBrowser.Refresh": []
@@ -202,16 +336,17 @@
       "deinterlace_mode": 0,
       "deinterlace_field_order": 0,
       "monitoring_type": 0,
+      "monitoring_enabled": false,
       "private_settings": {}
     },
     {
-      "prev_ver": 537001986,
-      "name": "Deer",
+      "prev_ver": 553648129,
+      "name": "Mascot",
       "uuid": "b9d52b24-00db-4a0f-b66b-cabc11bdf6d2",
       "id": "browser_source",
       "versioned_id": "browser_source",
       "settings": {
-        "url": "http://127.0.0.1:4460/mascot.html?set=deer",
+        "url": "http://127.0.0.1:4460/mascot/mascot.html?set=deer&overlay=hi-fi-rush",
         "width": 1920,
         "height": 1080,
         "shutdown": false,
@@ -232,6 +367,8 @@
       "hotkeys": {
         "libobs.mute": [],
         "libobs.unmute": [],
+        "libobs.monitor-on": [],
+        "libobs.monitor-off": [],
         "libobs.push-to-mute": [],
         "libobs.push-to-talk": [],
         "ObsBrowser.Refresh": []
@@ -239,16 +376,17 @@
       "deinterlace_mode": 0,
       "deinterlace_field_order": 0,
       "monitoring_type": 0,
+      "monitoring_enabled": false,
       "private_settings": {}
     },
     {
-      "prev_ver": 537001986,
+      "prev_ver": 553648129,
       "name": "OverlayV",
       "uuid": "2eb4a4c0-5b2b-4594-8fb1-b3ee22ebde7b",
       "id": "browser_source",
       "versioned_id": "browser_source",
       "settings": {
-        "url": "{{REPO}}/vertical.html",
+        "url": "{{REPO}}/overlays/hi-fi-rush/vertical.html",
         "width": 1080,
         "height": 1920,
         "shutdown": false,
@@ -269,6 +407,8 @@
       "hotkeys": {
         "libobs.mute": [],
         "libobs.unmute": [],
+        "libobs.monitor-on": [],
+        "libobs.monitor-off": [],
         "libobs.push-to-mute": [],
         "libobs.push-to-talk": [],
         "ObsBrowser.Refresh": []
@@ -276,16 +416,17 @@
       "deinterlace_mode": 0,
       "deinterlace_field_order": 0,
       "monitoring_type": 0,
+      "monitoring_enabled": false,
       "private_settings": {}
     },
     {
-      "prev_ver": 537001986,
-      "name": "DeerV",
+      "prev_ver": 553648129,
+      "name": "MascotV",
       "uuid": "5e28c454-3436-47e1-97f9-a9f441689751",
       "id": "browser_source",
       "versioned_id": "browser_source",
       "settings": {
-        "url": "http://127.0.0.1:4460/mascot.html?set=deer&place=placement-vertical.json",
+        "url": "http://127.0.0.1:4460/mascot/mascot.html?set=deer&overlay=hi-fi-rush&place=placement-vertical.json",
         "width": 1080,
         "height": 1920,
         "shutdown": false,
@@ -306,6 +447,8 @@
       "hotkeys": {
         "libobs.mute": [],
         "libobs.unmute": [],
+        "libobs.monitor-on": [],
+        "libobs.monitor-off": [],
         "libobs.push-to-mute": [],
         "libobs.push-to-talk": [],
         "ObsBrowser.Refresh": []
@@ -313,18 +456,313 @@
       "deinterlace_mode": 0,
       "deinterlace_field_order": 0,
       "monitoring_type": 0,
+      "monitoring_enabled": false,
       "private_settings": {}
     },
     {
-      "prev_ver": 537001986,
+      "prev_ver": 553648129,
+      "name": "Cam",
+      "uuid": "24946418-b1c1-4522-a3a3-be1ac1a64501",
+      "id": "ios_camera_source",
+      "versioned_id": "ios_camera_source",
+      "settings": {
+        "mode": "usb",
+        "usb_device": ""
+      },
+      "mixers": 255,
+      "sync": 0,
+      "flags": 0,
+      "volume": 1.0,
+      "balance": 0.5,
+      "enabled": true,
+      "muted": true,
+      "push-to-mute": false,
+      "push-to-mute-delay": 0,
+      "push-to-talk": false,
+      "push-to-talk-delay": 0,
+      "hotkeys": {
+        "libobs.mute": [],
+        "libobs.unmute": [],
+        "libobs.monitor-on": [],
+        "libobs.monitor-off": [],
+        "libobs.push-to-mute": [],
+        "libobs.push-to-talk": []
+      },
+      "deinterlace_mode": 0,
+      "deinterlace_field_order": 0,
+      "monitoring_type": 0,
+      "monitoring_enabled": false,
+      "private_settings": {},
+      "filters": [
+        {
+          "prev_ver": 553648129,
+          "name": "CAM OFF",
+          "uuid": "b59d3147-dc64-4402-a021-17c8e69b4872",
+          "id": "color_filter",
+          "versioned_id": "color_filter_v2",
+          "settings": {
+            "color_multiply": 0
+          },
+          "mixers": 0,
+          "sync": 0,
+          "flags": 0,
+          "volume": 1.0,
+          "balance": 0.5,
+          "enabled": false,
+          "muted": false,
+          "push-to-mute": false,
+          "push-to-mute-delay": 0,
+          "push-to-talk": false,
+          "push-to-talk-delay": 0,
+          "hotkeys": {},
+          "deinterlace_mode": 0,
+          "deinterlace_field_order": 0,
+          "monitoring_type": 0,
+          "monitoring_enabled": false,
+          "private_settings": {}
+        }
+      ]
+    },
+    {
+      "prev_ver": 553648129,
+      "name": "Tts",
+      "uuid": "5659074b-330e-44a2-ab28-d8101808192b",
+      "id": "browser_source",
+      "versioned_id": "browser_source",
+      "settings": {
+        "url": "{{REPO}}/chat/tts.html",
+        "width": 64,
+        "height": 64,
+        "shutdown": false,
+        "restart_when_active": false,
+        "reroute_audio": true
+      },
+      "mixers": 255,
+      "sync": 0,
+      "flags": 0,
+      "volume": 1.0,
+      "balance": 0.5,
+      "enabled": true,
+      "muted": false,
+      "push-to-mute": false,
+      "push-to-mute-delay": 0,
+      "push-to-talk": false,
+      "push-to-talk-delay": 0,
+      "hotkeys": {
+        "libobs.mute": [],
+        "libobs.unmute": [],
+        "libobs.monitor-on": [],
+        "libobs.monitor-off": [],
+        "libobs.push-to-mute": [],
+        "libobs.push-to-talk": [],
+        "ObsBrowser.Refresh": []
+      },
+      "deinterlace_mode": 0,
+      "deinterlace_field_order": 0,
+      "monitoring_type": 2,
+      "monitoring_enabled": true,
+      "private_settings": {}
+    },
+    {
+      "prev_ver": 553648129,
+      "name": "Browser",
+      "uuid": "dc252810-d136-4e0c-bf94-4083c390761e",
+      "id": "window_capture",
+      "versioned_id": "window_capture",
+      "settings": {
+        "capture_audio": true,
+        "priority": 2,
+        "window": "Google Chrome:Chrome_WidgetWin_1:chrome.exe",
+        "method": 2,
+        "cursor": true,
+        "client_area": true
+      },
+      "mixers": 255,
+      "sync": 0,
+      "flags": 0,
+      "volume": 1.0,
+      "balance": 0.5,
+      "enabled": true,
+      "muted": true,
+      "push-to-mute": false,
+      "push-to-mute-delay": 0,
+      "push-to-talk": false,
+      "push-to-talk-delay": 0,
+      "hotkeys": {
+        "libobs.mute": [],
+        "libobs.unmute": [],
+        "libobs.monitor-on": [],
+        "libobs.monitor-off": [],
+        "libobs.push-to-mute": [],
+        "libobs.push-to-talk": []
+      },
+      "deinterlace_mode": 0,
+      "deinterlace_field_order": 0,
+      "monitoring_type": 0,
+      "monitoring_enabled": false,
+      "private_settings": {},
+      "filters": [
+        {
+          "prev_ver": 553648129,
+          "name": "DUCK",
+          "uuid": "d1df149d-c639-4a43-91e5-4694ce7d4ffd",
+          "id": "compressor_filter",
+          "versioned_id": "compressor_filter",
+          "settings": {
+            "ratio": 3.0,
+            "threshold": -38.0,
+            "attack_time": 50,
+            "release_time": 1000,
+            "output_gain": 0.0,
+            "sidechain_source": "Mic/Aux"
+          },
+          "mixers": 255,
+          "sync": 0,
+          "flags": 0,
+          "volume": 1.0,
+          "balance": 0.5,
+          "enabled": true,
+          "muted": false,
+          "push-to-mute": false,
+          "push-to-mute-delay": 0,
+          "push-to-talk": false,
+          "push-to-talk-delay": 0,
+          "hotkeys": {},
+          "deinterlace_mode": 0,
+          "deinterlace_field_order": 0,
+          "monitoring_type": 0,
+          "monitoring_enabled": false,
+          "private_settings": {}
+        }
+      ]
+    },
+    {
+      "prev_ver": 553648129,
+      "name": "Discord",
+      "uuid": "d937ae23-d00d-4551-814d-0441defe56ef",
+      "id": "wasapi_process_output_capture",
+      "versioned_id": "wasapi_process_output_capture",
+      "settings": {
+        "priority": 2,
+        "window": "Discord:Chrome_WidgetWin_1:Discord.exe"
+      },
+      "mixers": 255,
+      "sync": 0,
+      "flags": 0,
+      "volume": 1.0,
+      "balance": 0.5,
+      "enabled": true,
+      "muted": false,
+      "push-to-mute": false,
+      "push-to-mute-delay": 0,
+      "push-to-talk": false,
+      "push-to-talk-delay": 0,
+      "hotkeys": {
+        "libobs.mute": [],
+        "libobs.unmute": [],
+        "libobs.monitor-on": [],
+        "libobs.monitor-off": [],
+        "libobs.push-to-mute": [],
+        "libobs.push-to-talk": []
+      },
+      "deinterlace_mode": 0,
+      "deinterlace_field_order": 0,
+      "monitoring_type": 0,
+      "monitoring_enabled": false,
+      "private_settings": {},
+      "filters": [
+        {
+          "prev_ver": 553648129,
+          "name": "Noise Suppression",
+          "uuid": "215b53fa-ed36-4cf4-b581-598d90c0d68f",
+          "id": "noise_suppress_filter",
+          "versioned_id": "noise_suppress_filter_v2",
+          "settings": {},
+          "mixers": 255,
+          "sync": 0,
+          "flags": 0,
+          "volume": 1.0,
+          "balance": 0.5,
+          "enabled": true,
+          "muted": false,
+          "push-to-mute": false,
+          "push-to-mute-delay": 0,
+          "push-to-talk": false,
+          "push-to-talk-delay": 0,
+          "hotkeys": {},
+          "deinterlace_mode": 0,
+          "deinterlace_field_order": 0,
+          "monitoring_type": 0,
+          "monitoring_enabled": false,
+          "private_settings": {}
+        }
+      ]
+    },
+    {
+      "prev_ver": 553648129,
       "name": "COMIC",
       "uuid": "ba9387c5-821a-4a30-99b9-d84b17f982eb",
       "id": "scene",
       "versioned_id": "scene",
       "settings": {
-        "id_counter": 5,
+        "id_counter": 9,
         "custom_size": false,
         "items": [
+          {
+            "name": "Tts",
+            "source_uuid": "5659074b-330e-44a2-ab28-d8101808192b",
+            "visible": true,
+            "locked": false,
+            "rot": 0.0,
+            "scale_ref": {
+              "x": 1920.0,
+              "y": 1080.0
+            },
+            "align": 5,
+            "bounds_type": 0,
+            "bounds_align": 0,
+            "bounds_crop": false,
+            "crop_left": 0,
+            "crop_top": 0,
+            "crop_right": 0,
+            "crop_bottom": 0,
+            "id": 7,
+            "group_item_backup": false,
+            "pos": {
+              "x": 2120.0,
+              "y": 1280.0
+            },
+            "pos_rel": {
+              "x": 2.1481480598449707,
+              "y": 1.3703703880310059
+            },
+            "scale": {
+              "x": 1.0,
+              "y": 1.0
+            },
+            "scale_rel": {
+              "x": 1.0,
+              "y": 1.0
+            },
+            "bounds": {
+              "x": 0.0,
+              "y": 0.0
+            },
+            "bounds_rel": {
+              "x": 0.0,
+              "y": 0.0
+            },
+            "scale_filter": "disable",
+            "blend_method": "default",
+            "blend_type": "normal",
+            "show_transition": {
+              "duration": 0
+            },
+            "hide_transition": {
+              "duration": 0
+            },
+            "private_settings": {}
+          },
           {
             "name": "Game",
             "source_uuid": "77ec0feb-72a7-4fdf-8feb-06789258e89c",
@@ -381,8 +819,8 @@
             "private_settings": {}
           },
           {
-            "name": "Cam",
-            "source_uuid": "c6e08561-868b-4394-b006-60cc98dfb735",
+            "name": "Browser",
+            "source_uuid": "dc252810-d136-4e0c-bf94-4083c390761e",
             "visible": true,
             "locked": false,
             "rot": 0.0,
@@ -394,11 +832,66 @@
             "bounds_type": 1,
             "bounds_align": 0,
             "bounds_crop": false,
-            "crop_left": 158,
+            "crop_left": 19,
             "crop_top": 0,
-            "crop_right": 158,
+            "crop_right": 19,
             "crop_bottom": 0,
-            "id": 2,
+            "id": 8,
+            "group_item_backup": false,
+            "pos": {
+              "x": 2120.0,
+              "y": 1280.0
+            },
+            "pos_rel": {
+              "x": 2.1481480598449707,
+              "y": 1.3703703880310059
+            },
+            "scale": {
+              "x": 1.0,
+              "y": 1.0
+            },
+            "scale_rel": {
+              "x": 1.0,
+              "y": 1.0
+            },
+            "bounds": {
+              "x": 16.0,
+              "y": 9.0
+            },
+            "bounds_rel": {
+              "x": 0.029629629105329514,
+              "y": 0.01666666753590107
+            },
+            "scale_filter": "disable",
+            "blend_method": "default",
+            "blend_type": "normal",
+            "show_transition": {
+              "duration": 0
+            },
+            "hide_transition": {
+              "duration": 0
+            },
+            "private_settings": {}
+          },
+          {
+            "name": "Cam",
+            "source_uuid": "24946418-b1c1-4522-a3a3-be1ac1a64501",
+            "visible": true,
+            "locked": false,
+            "rot": 0.0,
+            "scale_ref": {
+              "x": 1920.0,
+              "y": 1080.0
+            },
+            "align": 5,
+            "bounds_type": 3,
+            "bounds_align": 0,
+            "bounds_crop": false,
+            "crop_left": 0,
+            "crop_top": 0,
+            "crop_right": 0,
+            "crop_bottom": 0,
+            "id": 6,
             "group_item_backup": false,
             "pos": {
               "x": 1881.0,
@@ -428,10 +921,10 @@
             "blend_method": "default",
             "blend_type": "normal",
             "show_transition": {
-              "duration": 0
+              "duration": 300
             },
             "hide_transition": {
-              "duration": 0
+              "duration": 300
             },
             "private_settings": {}
           },
@@ -546,7 +1039,7 @@
             "private_settings": {}
           },
           {
-            "name": "Deer",
+            "name": "Mascot",
             "source_uuid": "b9d52b24-00db-4a0f-b66b-cabc11bdf6d2",
             "visible": true,
             "locked": false,
@@ -599,6 +1092,61 @@
               "duration": 0
             },
             "private_settings": {}
+          },
+          {
+            "name": "Discord",
+            "source_uuid": "d937ae23-d00d-4551-814d-0441defe56ef",
+            "visible": true,
+            "locked": false,
+            "rot": 0.0,
+            "scale_ref": {
+              "x": 1920.0,
+              "y": 1080.0
+            },
+            "align": 5,
+            "bounds_type": 0,
+            "bounds_align": 0,
+            "bounds_crop": false,
+            "crop_left": 0,
+            "crop_top": 0,
+            "crop_right": 0,
+            "crop_bottom": 0,
+            "id": 9,
+            "group_item_backup": false,
+            "pos": {
+              "x": 0.0,
+              "y": 0.0
+            },
+            "pos_rel": {
+              "x": -1.7777777910232544,
+              "y": -1.0
+            },
+            "scale": {
+              "x": 1.0,
+              "y": 1.0
+            },
+            "scale_rel": {
+              "x": 1.0,
+              "y": 1.0
+            },
+            "bounds": {
+              "x": 0.0,
+              "y": 0.0
+            },
+            "bounds_rel": {
+              "x": 0.0,
+              "y": 0.0
+            },
+            "scale_filter": "disable",
+            "blend_method": "default",
+            "blend_type": "normal",
+            "show_transition": {
+              "duration": 0
+            },
+            "hide_transition": {
+              "duration": 0
+            },
+            "private_settings": {}
           }
         ]
       },
@@ -615,25 +1163,32 @@
       "push-to-talk-delay": 0,
       "hotkeys": {
         "OBSBasic.SelectScene": [],
+        "libobs.show_scene_item.7": [],
+        "libobs.hide_scene_item.7": [],
         "libobs.show_scene_item.1": [],
         "libobs.hide_scene_item.1": [],
-        "libobs.show_scene_item.2": [],
-        "libobs.hide_scene_item.2": [],
+        "libobs.show_scene_item.8": [],
+        "libobs.hide_scene_item.8": [],
+        "libobs.show_scene_item.6": [],
+        "libobs.hide_scene_item.6": [],
         "libobs.show_scene_item.3": [],
         "libobs.hide_scene_item.3": [],
         "libobs.show_scene_item.4": [],
         "libobs.hide_scene_item.4": [],
         "libobs.show_scene_item.5": [],
-        "libobs.hide_scene_item.5": []
+        "libobs.hide_scene_item.5": [],
+        "libobs.show_scene_item.9": [],
+        "libobs.hide_scene_item.9": []
       },
       "deinterlace_mode": 0,
       "deinterlace_field_order": 0,
       "monitoring_type": 0,
+      "monitoring_enabled": false,
       "canvas_uuid": "6c69626f-6273-4c00-9d88-c5136d61696e",
       "private_settings": {}
     },
     {
-      "prev_ver": 537001986,
+      "prev_ver": 553648129,
       "name": "START",
       "uuid": "f09f293f-2049-4d26-98cd-eba1ee835775",
       "id": "scene",
@@ -718,11 +1273,12 @@
       "deinterlace_mode": 0,
       "deinterlace_field_order": 0,
       "monitoring_type": 0,
+      "monitoring_enabled": false,
       "canvas_uuid": "6c69626f-6273-4c00-9d88-c5136d61696e",
       "private_settings": {}
     },
     {
-      "prev_ver": 537001986,
+      "prev_ver": 553648129,
       "name": "CHAT",
       "uuid": "82d2ec8a-9aa7-4391-b9f8-216841320d0a",
       "id": "scene",
@@ -807,11 +1363,12 @@
       "deinterlace_mode": 0,
       "deinterlace_field_order": 0,
       "monitoring_type": 0,
+      "monitoring_enabled": false,
       "canvas_uuid": "6c69626f-6273-4c00-9d88-c5136d61696e",
       "private_settings": {}
     },
     {
-      "prev_ver": 537001986,
+      "prev_ver": 553648129,
       "name": "GAME",
       "uuid": "0d393d1b-bb73-4169-809e-716ea013a431",
       "id": "scene",
@@ -896,11 +1453,12 @@
       "deinterlace_mode": 0,
       "deinterlace_field_order": 0,
       "monitoring_type": 0,
+      "monitoring_enabled": false,
       "canvas_uuid": "6c69626f-6273-4c00-9d88-c5136d61696e",
       "private_settings": {}
     },
     {
-      "prev_ver": 537001986,
+      "prev_ver": 553648129,
       "name": "CAM",
       "uuid": "01095546-1984-457e-bd2f-be0515519684",
       "id": "scene",
@@ -985,11 +1543,12 @@
       "deinterlace_mode": 0,
       "deinterlace_field_order": 0,
       "monitoring_type": 0,
+      "monitoring_enabled": false,
       "canvas_uuid": "6c69626f-6273-4c00-9d88-c5136d61696e",
       "private_settings": {}
     },
     {
-      "prev_ver": 537001986,
+      "prev_ver": 553648129,
       "name": "BRB",
       "uuid": "60752891-4b3e-4f2e-a745-00ebe20e6a3a",
       "id": "scene",
@@ -1074,11 +1633,12 @@
       "deinterlace_mode": 0,
       "deinterlace_field_order": 0,
       "monitoring_type": 0,
+      "monitoring_enabled": false,
       "canvas_uuid": "6c69626f-6273-4c00-9d88-c5136d61696e",
       "private_settings": {}
     },
     {
-      "prev_ver": 537001986,
+      "prev_ver": 553648129,
       "name": "END",
       "uuid": "e2ce15c0-6fbc-4649-bfe9-42e015ddad1e",
       "id": "scene",
@@ -1163,17 +1723,18 @@
       "deinterlace_mode": 0,
       "deinterlace_field_order": 0,
       "monitoring_type": 0,
+      "monitoring_enabled": false,
       "canvas_uuid": "6c69626f-6273-4c00-9d88-c5136d61696e",
       "private_settings": {}
     },
     {
-      "prev_ver": 537001986,
+      "prev_ver": 553648129,
       "name": "VCOMIC",
-      "uuid": "36e424e9-d22a-437e-8c55-3dfcd9b9fc5d",
+      "uuid": "3d94c75c-8156-494d-ad86-3422dd2c6ee4",
       "id": "scene",
       "versioned_id": "scene",
       "settings": {
-        "id_counter": 5,
+        "id_counter": 6,
         "custom_size": false,
         "items": [
           {
@@ -1194,7 +1755,62 @@
             "crop_top": 0,
             "crop_right": 0,
             "crop_bottom": 0,
-            "id": 3,
+            "id": 1,
+            "group_item_backup": false,
+            "pos": {
+              "x": 1280.0,
+              "y": 2120.0
+            },
+            "pos_rel": {
+              "x": 0.7708333134651184,
+              "y": 1.2083332538604736
+            },
+            "scale": {
+              "x": 1.0,
+              "y": 1.0
+            },
+            "scale_rel": {
+              "x": 1.0,
+              "y": 1.0
+            },
+            "bounds": {
+              "x": 16.0,
+              "y": 9.0
+            },
+            "bounds_rel": {
+              "x": 0.01666666753590107,
+              "y": 0.00937500037252903
+            },
+            "scale_filter": "disable",
+            "blend_method": "default",
+            "blend_type": "normal",
+            "show_transition": {
+              "duration": 0
+            },
+            "hide_transition": {
+              "duration": 0
+            },
+            "private_settings": {}
+          },
+          {
+            "name": "Browser",
+            "source_uuid": "dc252810-d136-4e0c-bf94-4083c390761e",
+            "visible": true,
+            "locked": false,
+            "rot": 0.0,
+            "scale_ref": {
+              "x": 1080.0,
+              "y": 1920.0
+            },
+            "align": 5,
+            "bounds_type": 1,
+            "bounds_align": 0,
+            "bounds_crop": false,
+            "crop_left": 2,
+            "crop_top": 0,
+            "crop_right": 2,
+            "crop_bottom": 0,
+            "id": 6,
             "group_item_backup": false,
             "pos": {
               "x": 1280.0,
@@ -1233,7 +1849,7 @@
           },
           {
             "name": "Cam",
-            "source_uuid": "c6e08561-868b-4394-b006-60cc98dfb735",
+            "source_uuid": "24946418-b1c1-4522-a3a3-be1ac1a64501",
             "visible": true,
             "locked": false,
             "rot": 0.0,
@@ -1245,11 +1861,11 @@
             "bounds_type": 1,
             "bounds_align": 0,
             "bounds_crop": false,
-            "crop_left": 30,
+            "crop_left": 0,
             "crop_top": 0,
-            "crop_right": 30,
+            "crop_right": 0,
             "crop_bottom": 0,
-            "id": 4,
+            "id": 2,
             "group_item_backup": false,
             "pos": {
               "x": 1280.0,
@@ -1300,11 +1916,11 @@
             "bounds_type": 1,
             "bounds_align": 0,
             "bounds_crop": false,
-            "crop_left": 226,
+            "crop_left": 203,
             "crop_top": 0,
-            "crop_right": 226,
+            "crop_right": 203,
             "crop_bottom": 0,
-            "id": 5,
+            "id": 3,
             "group_item_backup": false,
             "pos": {
               "x": 1280.0,
@@ -1359,7 +1975,7 @@
             "crop_top": 0,
             "crop_right": 0,
             "crop_bottom": 0,
-            "id": 1,
+            "id": 4,
             "group_item_backup": false,
             "pos": {
               "x": 0.0,
@@ -1397,7 +2013,7 @@
             "private_settings": {}
           },
           {
-            "name": "DeerV",
+            "name": "MascotV",
             "source_uuid": "5e28c454-3436-47e1-97f9-a9f441689751",
             "visible": true,
             "locked": false,
@@ -1414,7 +2030,7 @@
             "crop_top": 0,
             "crop_right": 0,
             "crop_bottom": 0,
-            "id": 2,
+            "id": 5,
             "group_item_backup": false,
             "pos": {
               "x": 0.0,
@@ -1453,7 +2069,7 @@
           }
         ],
         "order": 0,
-        "canvas_active": false
+        "canvas_active": true
       },
       "mixers": 0,
       "sync": 0,
@@ -1467,9 +2083,10 @@
       "push-to-talk": false,
       "push-to-talk-delay": 0,
       "hotkeys": {
-        "OBSBasic.SelectScene": [],
         "libobs.show_scene_item.1": [],
         "libobs.hide_scene_item.1": [],
+        "libobs.show_scene_item.6": [],
+        "libobs.hide_scene_item.6": [],
         "libobs.show_scene_item.2": [],
         "libobs.hide_scene_item.2": [],
         "libobs.show_scene_item.3": [],
@@ -1477,12 +2094,14 @@
         "libobs.show_scene_item.4": [],
         "libobs.hide_scene_item.4": [],
         "libobs.show_scene_item.5": [],
-        "libobs.hide_scene_item.5": []
+        "libobs.hide_scene_item.5": [],
+        "OBSBasic.SelectScene": []
       },
       "deinterlace_mode": 0,
       "deinterlace_field_order": 0,
       "monitoring_type": 0,
-      "canvas_uuid": "fff831e1-6c1a-4a48-b79f-d5a3f321ce14",
+      "monitoring_enabled": false,
+      "canvas_uuid": "98175eb5-4b96-43f8-9e09-92a923a8b39e",
       "private_settings": {}
     }
   ],
@@ -1515,8 +2134,8 @@
   "canvases": [
     {
       "info": {
-        "name": "Aitum Vertical",
-        "uuid": "fff831e1-6c1a-4a48-b79f-d5a3f321ce14",
+        "name": "Restream Vertical",
+        "uuid": "98175eb5-4b96-43f8-9e09-92a923a8b39e",
         "private": false,
         "flags": 14
       }
@@ -1551,7 +2170,7 @@
   "saved_projectors": [],
   "preview_locked": false,
   "scaling_enabled": false,
-  "scaling_level": -8,
+  "scaling_level": -10,
   "scaling_off_x": 0.0,
   "scaling_off_y": 0.0,
   "virtual-camera": {
@@ -1583,6 +2202,10 @@
       "lang_id": 1033,
       "provider": "mssapi"
     }
+  },
+  "resolution": {
+    "x": 1920,
+    "y": 1080
   },
   "version": 2
 }
