@@ -15,7 +15,7 @@ clicking. See CLAUDE.md §2 for why the shape is what it is.
     python3 tools/obs-setup.py                  create and repair
     python3 tools/obs-setup.py --placeholders   colour blocks, no hardware
     python3 tools/obs-setup.py --prune          also remove strays from COMIC
-    python3 tools/obs-setup.py --export         write obs/comic-scenes.json
+    python3 tools/obs-setup.py --export         write overlays/<name>/obs/scenes.json
     python3 tools/obs-setup.py --vertical       also build VCOMIC on the
                                                 vertical canvas
     python3 tools/obs-setup.py --encoder auto   pick the best hardware encoder
@@ -56,6 +56,12 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
+
+# The overlay this script builds. There is one for now; once
+# overlays/<name>/overlay.json exists, --overlay picks it and the scene
+# collection it lives in (docs/adr/0003).
+OVERLAY = "hi-fi-rush"
+OVERLAY_DIR = REPO / "overlays" / OVERLAY
 
 CANVAS_W, CANVAS_H = 1920, 1080
 
@@ -540,16 +546,21 @@ VERT_VENDOR = "aitum-vertical-canvas"
 # chat" footer, #show-more the jump-to-latest pill. With the header and footer
 # hidden the message list reflows to the full height on its own. The selectors
 # are inert for any other provider, so this is safe to leave set.
-CHAT_CSS = """\
-body { background: #b9c3d6 !important; margin: 0; overflow: hidden; }
-yt-live-chat-header-renderer, #panel-pages, #show-more,
-yt-live-chat-banner-manager { display: none !important; }
-yt-live-chat-renderer, #chat, #contents, #item-list, #item-scroller, #items,
-yt-live-chat-item-list-renderer { background: transparent !important; }
-#item-scroller { overflow: hidden !important; }
-yt-live-chat-text-message-renderer { font-size: 20px !important; padding: 5px 10px !important; }
-yt-live-chat-text-message-renderer #author-name { color: #16161d !important; font-weight: 700 !important; }
-yt-live-chat-text-message-renderer #message { color: #16161d !important; }"""
+#
+# The CSS is the overlay's, not this script's -- each overlay styles the embed
+# to its own art -- so it lives beside the page as chat.css. Read as text, so a
+# checkout with CRLF line endings yields the same string OBS already holds.
+# Read when needed rather than at import: --clip and --go-live are deck
+# buttons, and a missing stylesheet must not stop a stream starting.
+CHAT_CSS_FILE = OVERLAY_DIR / "chat.css"
+
+
+def chat_css():
+    """The overlay's chat.css, or None if it is missing (preflight says so)."""
+    try:
+        return CHAT_CSS_FILE.read_text(encoding="utf-8")
+    except OSError:
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -750,7 +761,7 @@ def discover_password() -> str:
 # export
 
 
-EXPORT_DEFAULT = REPO / "obs" / "comic-scenes.json"
+EXPORT_DEFAULT = OVERLAY_DIR / "obs" / "scenes.json"
 
 # Query parameters and settings keys that carry a credential. Scrubbed by name
 # rather than by value, so this never has to know what the secret actually is.
@@ -1005,7 +1016,7 @@ def browser_settings(name: str, pw: str) -> dict:
         # file:// on purpose: the overlay must keep working when the mascot
         # bridge is not running. See README, "Why the overlay is file:// and
         # the mascot is http://".
-        url = (REPO / "overlay.html").as_uri()
+        url = (OVERLAY_DIR / "overlay.html").as_uri()
         if pw:
             url += "?pw=" + urllib.parse.quote(pw)
         return {
@@ -1017,7 +1028,10 @@ def browser_settings(name: str, pw: str) -> dict:
             "reroute_audio": True,      # alert audio rides the browser source
         }
     if name == "Deer":
-        url = "http://127.0.0.1:%d/mascot.html?set=deer" % MASCOT_PORT
+        # The bridge serves the repo root; `overlay` tells mascot.html whose
+        # placement file to read, since a set is shared and placement is not.
+        url = ("http://127.0.0.1:%d/mascot/mascot.html?set=deer&overlay=%s"
+               % (MASCOT_PORT, OVERLAY))
         if pw:
             url += "&pw=" + urllib.parse.quote(pw)
         return {
@@ -1034,7 +1048,7 @@ def browser_settings(name: str, pw: str) -> dict:
         # reroute_audio stays FALSE. Alert audio rides the horizontal Overlay
         # (CLAUDE.md §4); a second rerouted browser source would put every
         # alert sound into the mix twice.
-        url = (REPO / "vertical.html").as_uri()
+        url = (OVERLAY_DIR / "vertical.html").as_uri()
         if pw:
             url += "?pw=" + urllib.parse.quote(pw)
         return {
@@ -1049,8 +1063,8 @@ def browser_settings(name: str, pw: str) -> dict:
         # The vertical twin of Deer. Same bridge, same sprite set, different
         # placement file -- mascot.html needed no changes, because it already
         # takes `place` and sizes itself from innerWidth/innerHeight.
-        url = ("http://127.0.0.1:%d/mascot.html?set=deer"
-               "&place=placement-vertical.json" % MASCOT_PORT)
+        url = ("http://127.0.0.1:%d/mascot/mascot.html?set=deer&overlay=%s"
+               "&place=placement-vertical.json" % (MASCOT_PORT, OVERLAY))
         if pw:
             url += "&pw=" + urllib.parse.quote(pw)
         return {
@@ -1083,9 +1097,12 @@ def browser_settings(name: str, pw: str) -> dict:
         # The hole is punched, so the widget's page is what shows -- a
         # transparent chat box would read as a black rectangle cut out of the
         # panel. --peri is the chat panel's own background.
-        return {"url": "about:blank", "width": 800, "height": 938,
-                "css": CHAT_CSS,
+        want = {"url": "about:blank", "width": 800, "height": 938,
                 "shutdown": False, "restart_when_active": False}
+        css = chat_css()
+        if css is not None:
+            want["css"] = css
+        return want
     return {}
 
 
@@ -1136,10 +1153,12 @@ def main() -> None:
                          "plugin and a canvas added in its dock." % VERT_SCENE)
     ap.add_argument("--export", action="store_true",
                     help="write a sanitised copy of the scene collection to "
-                         "obs/comic-scenes.json and exit. Strips credentials and "
-                         "machine paths, so the result is safe to commit")
+                         "overlays/%s/obs/scenes.json and exit. Strips "
+                         "credentials and machine paths, so the result is safe "
+                         "to commit" % OVERLAY)
     ap.add_argument("--out", default="",
-                    help="--export: where to write (default obs/comic-scenes.json)")
+                    help="--export: where to write (default "
+                         "overlays/%s/obs/scenes.json)" % OVERLAY)
     ap.add_argument("--export-from", dest="export_from", default="",
                     help="--export: sanitise this file instead of OBS's live one, "
                          "e.g. something you made with Scene Collection -> Export")
@@ -1243,7 +1262,8 @@ def main() -> None:
             # Everything but the url, which is yours -- your channel, your
             # widget provider. The rest is derived from the hole.
             want = {k: want[k] for k in
-                    ("width", "height", "css", "shutdown", "restart_when_active")}
+                    ("width", "height", "css", "shutdown", "restart_when_active")
+                    if k in want}
         have = obs.req("GetInputSettings", {"inputName": name})["inputSettings"]
         diff = {k: v for k, v in want.items() if have.get(k) != v}
         # OBS omits defaults from the settings blob, so absent == the default.
@@ -2854,9 +2874,11 @@ def preflight(plan: Plan) -> None:
         finally:
             sock.close()
 
-    for rel in ("mascot/mascot.html", "mascot/placement.json",
-                "mascot/placement-vertical.json",
-                "mascot/deer/manifest.json", "overlay.html", "vertical.html",
+    here = "overlays/%s/" % OVERLAY
+    for rel in ("mascot/mascot.html", "mascot/sets/deer/manifest.json",
+                here + "mascot/placement.json",
+                here + "mascot/placement-vertical.json",
+                here + "overlay.html", here + "vertical.html", here + "chat.css",
                 "chat/tts.html", "chat/chat-bridge.py", "start.py"):
         if not (REPO / rel).exists():
             plan.warn("%s is missing from the repo" % rel)
@@ -2870,11 +2892,11 @@ def preflight(plan: Plan) -> None:
 
     # The sheet the manifest names, whatever it is called.
     try:
-        man = json.loads((REPO / "mascot/deer/manifest.json").read_text())
-        sheet = REPO / "mascot/deer" / man.get("sheet", "")
+        man = json.loads((REPO / "mascot/sets/deer/manifest.json").read_text())
+        sheet = REPO / "mascot/sets/deer" / man.get("sheet", "")
         if not sheet.exists():
             plan.warn(
-                "mascot/deer/manifest.json names %r but that file is not there. "
+                "mascot/sets/deer/manifest.json names %r but that file is not there. "
                 "It is gitignored if it is sheet.png -- only the webp ships."
                 % man.get("sheet")
             )

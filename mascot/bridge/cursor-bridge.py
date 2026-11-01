@@ -7,7 +7,9 @@ input they ever see comes from the Interact window. So the cursor position has
 to be read outside the browser and pushed in.
 
 This does both jobs in one process:
-  * serves the mascot/ directory over HTTP, so OBS has one URL to point at
+  * serves the mascot over HTTP, so OBS has one URL to point at: the shared
+    page and sprite sets in mascot/, and each overlay's placement files in
+    overlays/<name>/mascot/ -- nothing else in the repo
   * streams the cursor over Server-Sent Events at /cursor
 
 Standard library only -- no pip install. macOS reads CGEventGetLocation through
@@ -21,7 +23,7 @@ and the page sees one shape of data.
     python3 cursor-bridge.py --display 1 --port 4460
 
 Then point an OBS browser source at:
-    http://127.0.0.1:4460/mascot.html?set=deer
+    http://127.0.0.1:4460/mascot/mascot.html?set=deer&overlay=hi-fi-rush
 """
 
 from __future__ import annotations
@@ -30,14 +32,21 @@ import argparse
 import ctypes
 import ctypes.util
 import json
+import posixpath
+import re
 import sys
 import threading
 import time
+import urllib.parse
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-WEB_ROOT = Path(__file__).resolve().parent.parent
+# The repo root, because placement belongs to an overlay and the sprite sets
+# do not. SERVED keeps it to the mascot's own files: the root also holds the
+# blocklist, the venv and .git, none of which a loopback port should hand out.
+WEB_ROOT = Path(__file__).resolve().parent.parent.parent
+SERVED = re.compile(r"^/(mascot|overlays/[\w-]+/mascot)/")
 
 
 # ---------------------------------------------------------------------------
@@ -201,10 +210,22 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         SimpleHTTPRequestHandler.end_headers(self)
 
+    def _served(self) -> bool:
+        path = posixpath.normpath(urllib.parse.unquote(self.path.split("?")[0]))
+        if SERVED.match(path + "/"):
+            return True
+        self.send_error(404)
+        return False
+
     def do_GET(self) -> None:
         if self.path.split("?")[0] == "/cursor":
             return self._stream()
-        SimpleHTTPRequestHandler.do_GET(self)
+        if self._served():
+            SimpleHTTPRequestHandler.do_GET(self)
+
+    def do_HEAD(self) -> None:
+        if self._served():
+            SimpleHTTPRequestHandler.do_HEAD(self)
 
     def _stream(self) -> None:
         self.send_response(200)
@@ -270,7 +291,8 @@ def main() -> None:
     print("  serving  %s" % WEB_ROOT)
     print()
     print("  OBS browser source URL:")
-    print("    http://127.0.0.1:%d/mascot.html?set=deer" % a.port)
+    print("    http://127.0.0.1:%d/mascot/mascot.html?set=deer&overlay=hi-fi-rush"
+          % a.port)
     print()
     print("  ctrl-C to stop")
     try:

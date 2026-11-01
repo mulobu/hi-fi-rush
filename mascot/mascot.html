@@ -7,9 +7,12 @@
   Knows nothing about overlay.html and shares nothing with it. Drop it in any
   scene, point it at any sprite set built by tools/hero-asset.py.
 
-    http://127.0.0.1:4460/mascot.html?set=deer
-    http://127.0.0.1:4460/mascot.html?set=deer&anchor=bottom-left&size=280
-    http://127.0.0.1:4460/mascot.html?set=deer&debug=1
+    http://127.0.0.1:4460/mascot/mascot.html?set=deer&overlay=hi-fi-rush
+    http://127.0.0.1:4460/mascot/mascot.html?set=deer&place=off&anchor=bottom-left&size=280
+    http://127.0.0.1:4460/mascot/mascot.html?set=deer&overlay=hi-fi-rush&debug=1
+
+  The bridge serves the repo root. Sprite sets are shared, in sets/ next to
+  this file; placement belongs to the overlay, in overlays/<name>/mascot/.
 
   It also follows OBS scenes. placement.json maps a scene name to a spot in
   camera space; on a scene change the mascot walks to that spot, and hides on
@@ -22,9 +25,11 @@
   The only shared fact is the OBS scene name.
 
   Params
-    set      sprite folder next to this file          (default: deer)
-    place    placement file next to this file, or
-             `off` to ignore scenes entirely     (default: placement.json)
+    set      sprite set in sets/ next to this file    (default: deer)
+    overlay  read placement from overlays/<overlay>/mascot/
+    place    placement file in that folder (next to this file without
+             `overlay`), or `off` to ignore scenes entirely
+                                                      (default: placement.json)
     scene    force a scene name, for testing outside OBS
     host     obs-websocket url             (default: ws://127.0.0.1:4455)
     pw       obs-websocket password
@@ -165,6 +170,9 @@
   const DEBUG   = P.get("debug") === "1";
   const STORE   = "mascot.edit." + SET;
   const PLACE   = (P.get("place") || "placement.json").replace(/[^\w./-]/g, "");
+  const OVERLAY = (P.get("overlay") || "").replace(/[^\w-]/g, "");
+  const SET_DIR = "sets/" + SET + "/";
+  const PLACE_DIR = OVERLAY ? "../overlays/" + OVERLAY + "/mascot/" : "";
   const WS_URL  = P.get("host") || "ws://127.0.0.1:4455";
   const WS_PW   = P.get("pw") || "";
 
@@ -600,7 +608,8 @@
     editPivot.value = editPivotNum.value = cfg.pivot.toFixed(2);
     editUrl.value = places ? placementSnippet() : finalUrl();
     editHint.textContent = places
-      ? "Drag the mascot, then paste this line into mascot/placement.json "
+      ? "Drag the mascot, then paste this line into "
+        + (OVERLAY ? "overlays/" + OVERLAY + "/mascot/" : "mascot/") + PLACE + " "
         + "under \"scenes\". Switch scenes in OBS to author the next one."
       : "Drag the mascot to position it. Use the copied URL in OBS without "
         + "edit mode.";
@@ -736,7 +745,7 @@
      mascot this page had before it knew about scenes. */
   function loadPlacement() {
     if (PLACE === "off") return Promise.resolve(null);
-    return retryFetch(PLACE, 6)
+    return retryFetch(PLACE_DIR + PLACE, 6)
       .then(j => (j && typeof j === "object" ? j : null))
       .catch(() => {
         src = "no " + PLACE + ", ignoring scenes";
@@ -745,13 +754,13 @@
   }
 
   Promise.all([
-    retryFetch(SET + "/manifest.json", 60),   // ~8 minutes of patience
+    retryFetch(SET_DIR + "manifest.json", 60),   // ~8 minutes of patience
     loadPlacement(),
   ])
     .then(([m, pl]) => {
       man = m;
       places = pl;
-      el.style.backgroundImage = "url('" + SET + "/" + m.sheet + "')";
+      el.style.backgroundImage = "url('" + SET_DIR + m.sheet + "')";
       resizeSprite();
       place();
       draw(0);
@@ -764,7 +773,7 @@
       // paint shows an empty box
       const img = new Image();
       img.onload = img.onerror = () => el.classList.add("ready");
-      img.src = SET + "/" + m.sheet;
+      img.src = SET_DIR + m.sheet;
 
       if (EDIT) {
         src = "edit mode (browser)";
@@ -782,7 +791,7 @@
     })
     .catch(err => {
       hud.classList.add("on");
-      hud.textContent = "could not load " + SET + "/manifest.json\n" + err +
+      hud.textContent = "could not load " + SET_DIR + "manifest.json\n" + err +
         "\n\nis cursor-bridge.py running, and is ?set= a folder next to mascot.html?";
     });
 })();
