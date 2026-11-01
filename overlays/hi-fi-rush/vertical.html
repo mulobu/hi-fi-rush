@@ -930,6 +930,8 @@
       <div id="hudLog"></div>
     </div>
 
+    <script src="../../core/contract.js"></script>
+    <script src="../../core/base.js"></script>
     <script>
       const PAGE_W = 4320,
         PAGE_H = 7680,
@@ -949,9 +951,6 @@
         SAFE_BOTTOM = 324,
         SAFE_RIGHT = 164,
         SAFE_PAD = 12;
-
-      const params = new URLSearchParams(location.search);
-      const DEBUG = params.has("debug");
 
       /* ================================================================
    PANEL CONFIG — single source of truth, vertical page.
@@ -1206,39 +1205,13 @@
         },
       ];
 
-      /* Platforms that share a handle share a label. */
-      const SOCIALS = [
-        { handle: "thedeepeffect", on: ["kick"] },
-        { handle: "thedeepeffect_", on: ["twitch", "youtube"] },
-        { handle: "@thedeepeffect__", on: ["instagram"] },
-      ];
-      const SOCIAL_NAMES = {
-        kick: "Kick",
-        twitch: "Twitch",
-        youtube: "YouTube",
-        instagram: "Instagram",
-      };
-
-      function socialsFor(p, cls, style) {
-        const s = p.socials,
-          u = (s.size || 1) / scaleFor(p);
-        return (
-          `<div class="socials ${s.layout || "stack"} ${cls}" style="--u:${u.toFixed(4)};${style}">` +
-          SOCIALS.map(
-            (g, i) =>
-              (s.layout === "pair" && i === 0 ? `<div class="soc-line">` : "") +
-              `<div class="soc-row">` +
-              g.on
-                .map(
-                  (n) =>
-                    `<img class="cut" src="../../assets/socials/${n}.svg" alt="${SOCIAL_NAMES[n]}">`,
-                )
-                .join("") +
-              `<span class="handle"><span>${g.handle}</span></span></div>` +
-              (s.layout === "pair" && i === 1 ? `</div>` : ""),
-          ).join("") +
-          `</div>`
-        );
+      /* The panel's resting scale. Shared with fitTagsToSafeArea(), which
+         must not measure it off a rendered rect — getBoundingClientRect
+         returns a rotated AABB, and every panel here is tilted. */
+      function scaleFor(p) {
+        const sx = CANVAS_W / p.w,
+          sy = CANVAS_H / p.h;
+        return p.fit === "fill" ? Math.max(sx, sy) : Math.min(sx, sy) * 0.97;
       }
 
       /* ================================================================
@@ -1307,146 +1280,6 @@
       }
 
       /* ================================================================
-   BUILD
-   ================================================================ */
-      /* frameEl, not `viewport` — CEF already defines window.viewport, which
-         shadows id-based global lookup and yields a platform object with no
-         getBoundingClientRect. */
-      const frameEl = document.getElementById("viewport"),
-        pageEl = document.getElementById("page"),
-        panelEls = {},
-        holeEls = [];
-
-      ["skirt-n", "skirt-s", "skirt-w", "skirt-e"].forEach((c) => {
-        const b = document.createElement("div");
-        b.className = c;
-        pageEl.appendChild(b);
-      });
-
-      const pageUnder = document.createElement("div");
-      pageUnder.className = "page-under";
-      pageEl.appendChild(pageUnder);
-
-      PANELS.forEach((p) => {
-        const el = document.createElement("div");
-        el.className = `panel ${p.cls}`;
-        el.dataset.id = p.id;
-        Object.assign(el.style, {
-          left: p.x + "px",
-          top: p.y + "px",
-          width: p.w + "px",
-          height: p.h + "px",
-          transform: `rotate(${p.rot}deg)`,
-        });
-
-        const holesHTML = (p.holes || [])
-          .map(
-            (h, i) =>
-              `<div class="hole${h.bare ? " bare" : ""}" data-hole="${p.key}:${i}"
-       style="left:${h.x}%;top:${h.y}%;width:${h.w}%;height:${h.h}%">
-       <div class="fake-source" style="--src:${h.c}">
-         <span class="src-label">${h.label}</span></div>
-     </div>`,
-          )
-          .join("");
-
-        /* Order is the whole trick: .under is masked, everything after it is
-           not. Holes keep their inked borders, and speedlines and tag stay on
-           top of the video. */
-        const panelSocials =
-          p.socials && !p.socials.page ? socialsFor(p, "over", p.socials.at) : "";
-        el.innerHTML =
-          `<div class="under">${artFor(p)}${panelSocials}` +
-          (p.speedlines ? '<div class="speedlines"></div>' : "") +
-          `</div>` +
-          holesHTML +
-          `<span class="panel-tag">${p.tag}</span>`;
-
-        el.querySelectorAll(".under .over").forEach((n) => el.appendChild(n));
-
-        pageEl.appendChild(el);
-        panelEls[p.id] = el;
-        /* Gutter-placed socials ride the page, outside every mask. */
-        if (p.socials && p.socials.page)
-          pageEl.insertAdjacentHTML(
-            "beforeend",
-            socialsFor(
-              p,
-              "",
-              `left:${p.socials.page.x}px;top:${p.socials.page.y}px`,
-            ),
-          );
-        (p.holes || []).forEach((h, i) =>
-          holeEls.push({
-            src: h.src,
-            key: `${p.key}:${h.src}`,
-            panelId: p.id,
-            el: el.querySelector(`[data-hole="${p.key}:${i}"]`),
-          }),
-        );
-      });
-
-      /* The panel's own background moves into .under, or it paints behind the
-         hole and no mask on .under can help. */
-      PANELS.forEach((p) => {
-        const el = panelEls[p.id],
-          under = el.querySelector(".under");
-        if (!under) return;
-        const cs = getComputedStyle(el);
-        Object.assign(under.style, {
-          backgroundColor: cs.backgroundColor,
-          backgroundImage: cs.backgroundImage,
-          backgroundSize: cs.backgroundSize,
-          backgroundPosition: cs.backgroundPosition,
-          backgroundRepeat: cs.backgroundRepeat,
-        });
-        el.style.background = "none";
-      });
-
-      const PANEL_BORDER = 15; /* matches .panel border-width */
-
-      (() => {
-        const probe = pageEl.querySelector(".hole:not(.bare)");
-        const HB = probe
-          ? parseFloat(getComputedStyle(probe).borderTopWidth)
-          : 11;
-        let k = 0;
-        PANELS.forEach((p) => {
-          const cx = p.x + p.w / 2,
-            cy = p.y + p.h / 2;
-          const iw = p.w - 2 * PANEL_BORDER,
-            ih = p.h - 2 * PANEL_BORDER;
-          (p.holes || []).forEach((h) => {
-            const b = h.bare ? 0 : HB;
-            const lx = (iw * h.x) / 100,
-              ly = (ih * h.y) / 100,
-              lw = (iw * h.w) / 100,
-              lh = (ih * h.h) / 100;
-            Object.assign(holeEls[k++], {
-              rot: p.rot,
-              cx,
-              cy,
-              panelW: iw,
-              panelH: ih,
-              local: { x: lx + b, y: ly + b, w: lw - 2 * b, h: lh - 2 * b },
-              page: {
-                x: p.x + PANEL_BORDER + lx,
-                y: p.y + PANEL_BORDER + ly,
-                w: lw,
-                h: lh,
-              },
-              pageInner: {
-                x: p.x + PANEL_BORDER + lx + b,
-                y: p.y + PANEL_BORDER + ly + b,
-                w: lw - 2 * b,
-                h: lh - 2 * b,
-              },
-            });
-          });
-        });
-      })();
-
-      /* ================================================================
    SAFE-ZONE PASS — measured off the built page, not modelled.
 
    §4's signature element is the panel tag, and it sat below the platform
@@ -1489,326 +1322,6 @@
         pageEl.style.transition = "";
       }
 
-      if (document.fonts && document.fonts.ready) {
-        document.fonts.ready.then(fitTagsToSafeArea);
-      } else {
-        fitTagsToSafeArea();
-      }
-
-      /* Shared mutable state, declared up front — applyPunch() runs as soon as
-         the first scene arrives, which can be before the sections below have
-         been evaluated. */
-      let ws = null,
-        wsReady = false,
-        reqId = 0,
-        backoff = 1000,
-        punched = new Set();
-      const pendingReq = new Map();
-      const itemIds = new Map(); /* sourceName -> sceneItemId */
-      const srcSize = new Map(); /* sourceName -> {w, h} in source pixels */
-      const itemOn = new Map(); /* sourceName -> enabled, as OBS last reported */
-      const managed = new Set(holeEls.map((h) => h.src));
-
-      /* The browser stands in for the game while it is UNMUTED, exactly as on
-         the horizontal page — same input, same mute, so one switch moves both
-         canvases. Not in `managed`: a VCOMIC without Browser is complete, so
-         its absence must not keep the rebind loop below spinning. */
-      const BROWSER = "Browser";
-      let browserLive = false;
-      const feed = (src) =>
-        src === "Game" && browserLive && itemIds.has(BROWSER) ? BROWSER : src;
-
-      /* ================================================================
-   HOLE PUNCH — masks generated from the same PANELS config.
-
-   Identical to the horizontal page: one path per mask, fill-rule
-   evenodd, only each hole's content box cut so borders and shadows
-   survive by construction. See CLAUDE.md §2 for the four ways to get
-   this silently wrong.
-   ================================================================ */
-      const rotPt = (px, py, cx, cy, deg) => {
-        const a = (deg * Math.PI) / 180,
-          c = Math.cos(a),
-          s = Math.sin(a),
-          dx = px - cx,
-          dy = py - cy;
-        return [cx + dx * c - dy * s, cy + dx * s + dy * c];
-      };
-
-      const quad = (x, y, w, h, cx, cy, deg) =>
-        "M" +
-        [
-          [x, y],
-          [x + w, y],
-          [x + w, y + h],
-          [x, y + h],
-        ]
-          .map(([px, py]) =>
-            rotPt(px, py, cx, cy, deg)
-              .map((n) => n.toFixed(1))
-              .join(" "),
-          )
-          .join("L") +
-        "Z";
-
-      function applyMask(el, X, Y, W, H, cuts) {
-        const d = `M${X} ${Y}H${X + W}V${Y + H}H${X}Z` + cuts;
-        const svg =
-          `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" ` +
-          `viewBox="${X} ${Y} ${W} ${H}">` +
-          `<path fill="#000" fill-rule="evenodd" d="${d}"/></svg>`;
-        const uri = `url("data:image/svg+xml;utf8,${encodeURIComponent(svg)}")`;
-        Object.assign(el.style, {
-          maskImage: uri,
-          webkitMaskImage: uri,
-          maskSize: `${W}px ${H}px`,
-          webkitMaskSize: `${W}px ${H}px`,
-          maskPosition: `${X}px ${Y}px`,
-          webkitMaskPosition: `${X}px ${Y}px`,
-          maskRepeat: "no-repeat",
-          webkitMaskRepeat: "no-repeat",
-          maskClip: "no-clip",
-          webkitMaskClip: "no-clip",
-        });
-      }
-
-      function pageCorners(r, cx, cy, deg) {
-        return [
-          [r.x, r.y],
-          [r.x + r.w, r.y],
-          [r.x + r.w, r.y + r.h],
-          [r.x, r.y + r.h],
-        ].map(([x, y]) => rotPt(x, y, cx, cy, deg));
-      }
-
-      function restingRects(id) {
-        const m = new DOMMatrix(transformFor(String(id)));
-        return holeEls.map((h) => {
-          const pts = pageCorners(h.page, h.cx, h.cy, h.rot).map(([x, y]) =>
-            m.transformPoint(new DOMPoint(x, y)),
-          );
-          const xs = pts.map((q) => q.x),
-            ys = pts.map((q) => q.y);
-          const x = Math.min(...xs),
-            y = Math.min(...ys);
-          const w = Math.max(...xs) - x,
-            hh = Math.max(...ys) - y;
-          const vx = Math.max(0, Math.min(CANVAS_W, x + w) - Math.max(0, x));
-          const vy = Math.max(0, Math.min(CANVAS_H, y + hh) - Math.max(0, y));
-          return { hole: h, onScreen: vx * vy };
-        });
-      }
-
-      /* One OBS item per source in the vertical scene, so a source can only be
-         in one hole at a time — Cam is referenced by four panels here too. The
-         panel on air wins; failing that, whichever on-screen hole shows the
-         most of itself takes it. */
-      function chooseWinners(id) {
-        const best = new Map();
-        restingRects(id).forEach((r) => {
-          if (!r.onScreen) return;
-          const live = r.hole.panelId === id;
-          const cur = best.get(r.hole.src);
-          if (
-            !cur ||
-            (live && !cur.live) ||
-            (live === cur.live && r.onScreen > cur.onScreen)
-          )
-            best.set(r.hole.src, { hole: r.hole, live, onScreen: r.onScreen });
-        });
-        return new Set([...best.values()].map((v) => v.hole));
-      }
-
-      const contains = (a, b) =>
-        b.x >= a.x &&
-        b.y >= a.y &&
-        b.x + b.w <= a.x + a.w &&
-        b.y + b.h <= a.y + a.h;
-
-      /* No hole on this page nests inside another — the game panel's two
-         windows are stacked, not concentric — so this should find nothing to
-         drop. Kept because evenodd would flip a contained cut back to opaque
-         in silence, and a future panel could reintroduce one. */
-      function mergeCuts(holes) {
-        const kept = holes.filter(
-          (h) => !holes.some((g) => g !== h && contains(g.local, h.local)),
-        );
-        if (DEBUG)
-          kept.forEach((h, i) =>
-            kept.slice(i + 1).forEach((g) => {
-              const o =
-                h.local.x < g.local.x + g.local.w &&
-                g.local.x < h.local.x + h.local.w &&
-                h.local.y < g.local.y + g.local.h &&
-                g.local.y < h.local.y + h.local.h;
-              if (o) hud(`cuts overlap: ${h.key} / ${g.key}`, true);
-            }),
-          );
-        return kept;
-      }
-
-      function applyPunch(id) {
-        punched = id >= 0 ? chooseWinners(id) : new Set();
-        holeEls.forEach((h) =>
-          h.el.classList.toggle("punched", punched.has(h)),
-        );
-
-        let pageCuts = "";
-        PANELS.forEach((p) => {
-          const under = panelEls[p.id].querySelector(".under");
-          if (!under) return;
-          const mine = mergeCuts(
-            holeEls.filter((h) => h.panelId === p.id && punched.has(h)),
-          );
-          if (!mine.length) {
-            under.style.maskImage = "none";
-            under.style.webkitMaskImage = "none";
-            return;
-          }
-          let panelCuts = "";
-          mine.forEach((h) => {
-            panelCuts += quad(
-              h.local.x,
-              h.local.y,
-              h.local.w,
-              h.local.h,
-              0,
-              0,
-              0,
-            );
-            pageCuts += quad(
-              h.pageInner.x,
-              h.pageInner.y,
-              h.pageInner.w,
-              h.pageInner.h,
-              h.cx,
-              h.cy,
-              h.rot,
-            );
-          });
-          applyMask(under, 0, 0, mine[0].panelW, mine[0].panelH, panelCuts);
-        });
-
-        applyMask(pageUnder, 0, 0, PAGE_W, PAGE_H, pageCuts);
-        syncVisibility();
-      }
-      applyPunch(-1); /* nothing live yet — page fully opaque */
-
-      /* Countdown on the standby panel */
-      let secs = 300;
-      setInterval(() => {
-        const c = document.getElementById("countdown");
-        if (!c) return;
-        secs = secs > 0 ? secs - 1 : 300;
-        c.textContent = `${String(Math.floor(secs / 60)).padStart(2, "0")}:${String(secs % 60).padStart(2, "0")}`;
-      }, 1000);
-
-      /* ================================================================
-   PAN MATH
-     translate(viewport centre)
-     rotate(-panel tilt)      -> panel squares up to the frame
-     scale(fit)
-     translate(-panel centre)
-   ================================================================ */
-      let current = null;
-      /* The panel's resting scale. Shared with fitTagsToSafeArea(), which
-         must not measure it off a rendered rect — getBoundingClientRect
-         returns a rotated AABB, and every panel here is tilted. */
-      function scaleFor(p) {
-        const sx = CANVAS_W / p.w,
-          sy = CANVAS_H / p.h;
-        return p.fit === "fill" ? Math.max(sx, sy) : Math.min(sx, sy) * 0.97;
-      }
-      function transformFor(t) {
-        if (t === "page") {
-          const s = Math.min(CANVAS_W / PAGE_W, CANVAS_H / PAGE_H) * 0.94;
-          return `translate(${CANVAS_W / 2}px,${CANVAS_H / 2}px) scale(${s}) translate(${-PAGE_W / 2}px,${-PAGE_H / 2}px)`;
-        }
-        const p = PANELS.find((v) => v.id === Number(t));
-        const s = scaleFor(p);
-        const cx = p.x + p.w / 2,
-          cy = p.y + p.h / 2;
-        return `translate(${CANVAS_W / 2}px,${CANVAS_H / 2}px) rotate(${-p.rot}deg) scale(${s}) translate(${-cx}px,${-cy}px)`;
-      }
-
-      const shaker = document.getElementById("shaker");
-      let shakeTimer;
-
-      const PAN_MS = parseFloat(
-        getComputedStyle(document.documentElement).getPropertyValue("--pan-ms"),
-      );
-
-      function goTo(t, { instant = false } = {}) {
-        current = t;
-        applyPunch(Number(t));
-        Object.entries(panelEls).forEach(([id, el]) =>
-          el.classList.toggle("is-live", id === String(t)),
-        );
-
-        clearTimeout(shakeTimer);
-
-        if (instant) {
-          pageEl.style.transition = "none";
-          pageEl.style.transform = transformFor(t);
-          void pageEl.offsetWidth;
-          pageEl.style.transition = "";
-          startTracking(120);
-          return;
-        }
-
-        pageEl.style.transform = transformFor(t);
-        startTracking(PAN_MS + 260);
-
-        shakeTimer = setTimeout(() => {
-          shaker.classList.remove("shake");
-          void shaker.offsetWidth;
-          shaker.classList.add("shake");
-        }, 810);
-      }
-
-      /* ================================================================
-   HOLE RECTS — one row per hole, already in vertical-canvas coordinates.
-   ================================================================ */
-      function holeRects() {
-        const vp = frameEl.getBoundingClientRect();
-        return holeEls.map((h) => {
-          const r = h.el.getBoundingClientRect();
-          const x = r.left - vp.left,
-            y = r.top - vp.top;
-          return {
-            hole: h,
-            src: h.src,
-            key: h.key,
-            x,
-            y,
-            w: r.width,
-            h: r.height,
-            visible:
-              x < CANVAS_W &&
-              y < CANVAS_H &&
-              x + r.width > 0 &&
-              y + r.height > 0,
-          };
-        });
-      }
-
-      let trackRAF = 0,
-        trackUntil = 0;
-
-      function track() {
-        const rects = holeRects();
-        if (DEBUG) paintRects(rects);
-        pushRects(rects);
-        if (performance.now() < trackUntil)
-          trackRAF = requestAnimationFrame(track);
-        else trackRAF = 0;
-      }
-
-      function startTracking(ms) {
-        trackUntil = Math.max(trackUntil, performance.now() + ms);
-        if (!trackRAF) track();
-      }
-
       /* ================================================================
    OBS WIRING — vertical canvas
 
@@ -1849,130 +1362,7 @@
       };
 
       let vertCanvasUuid = null,
-        vertSceneUuid = null,
-        currentScene = null,
-        seeded = false;
-
-      function applyScene(name, via) {
-        if (!name) return;
-
-        const id = SCENE_MAP[name];
-        if (!id) return hud(`${via}: ${name} — not a mapped scene, ignored`);
-
-        /* Both paths can report the same switch a few ms apart. First wins;
-           the second is a no-op rather than a second pan. */
-        if (name === currentScene) return;
-
-        currentScene = name;
-        const first = !seeded;
-        seeded = true;
-        goTo(String(id), { instant: first });
-        syncVisibility();
-        /* Re-read sizes: the crop that makes a source fill its opening depends
-           on them, and a capture can change resolution at any time. */
-        if (wsReady && vertSceneUuid) loadItemIds({ quiet: true });
-        hud(`${via}: ${name} → panel ${id}${first ? " (seed)" : ""}`);
-      }
-
-      /* --- path A (secondary): window.obsstudio ------------------------ */
-      window.addEventListener("obsSceneChanged", (e) =>
-        applyScene(e.detail && e.detail.name, "obsstudio"),
-      );
-
-      /* --- path B (primary): obs-websocket v5 -------------------------- */
-      const K = [
-        0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1,
-        0x923f82a4, 0xab1c5ed5, 0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3,
-        0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174, 0xe49b69c1, 0xefbe4786,
-        0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
-        0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147,
-        0x06ca6351, 0x14292967, 0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13,
-        0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85, 0xa2bfe8a1, 0xa81a664b,
-        0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
-        0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a,
-        0x5b9cca4f, 0x682e6ff3, 0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208,
-        0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
-      ];
-      const rotr = (x, n) => ((x >>> n) | (x << (32 - n))) >>> 0;
-
-      /* Hand-rolled because crypto.subtle needs a secure context and this page
-         is loaded from file:// inside CEF. */
-      function sha256(bytes) {
-        const len = bytes.length;
-        const buf = new Uint8Array(((len + 9 + 63) >> 6) << 6);
-        buf.set(bytes);
-        buf[len] = 0x80;
-        const dv = new DataView(buf.buffer);
-        dv.setUint32(buf.length - 4, len << 3, false);
-        dv.setUint32(buf.length - 8, Math.floor((len * 8) / 0x100000000), false);
-        let H = [
-          0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f,
-          0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
-        ];
-        const w = new Uint32Array(64);
-        for (let i = 0; i < buf.length; i += 64) {
-          for (let t = 0; t < 16; t++) w[t] = dv.getUint32(i + t * 4, false);
-          for (let t = 16; t < 64; t++) {
-            const s0 =
-              rotr(w[t - 15], 7) ^ rotr(w[t - 15], 18) ^ (w[t - 15] >>> 3);
-            const s1 =
-              rotr(w[t - 2], 17) ^ rotr(w[t - 2], 19) ^ (w[t - 2] >>> 10);
-            w[t] = (w[t - 16] + s0 + w[t - 7] + s1) >>> 0;
-          }
-          let [a, b, c, d, e, f, g, h] = H;
-          for (let t = 0; t < 64; t++) {
-            const S1 = rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25);
-            const ch = (e & f) ^ (~e & g);
-            const t1 = (h + S1 + ch + K[t] + w[t]) >>> 0;
-            const S0 = rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22);
-            const mj = (a & b) ^ (a & c) ^ (b & c);
-            const t2 = (S0 + mj) >>> 0;
-            h = g;
-            g = f;
-            f = e;
-            e = (d + t1) >>> 0;
-            d = c;
-            c = b;
-            b = a;
-            a = (t1 + t2) >>> 0;
-          }
-          H = H.map((v, j) => (v + [a, b, c, d, e, f, g, h][j]) >>> 0);
-        }
-        const out = new Uint8Array(32);
-        const odv = new DataView(out.buffer);
-        H.forEach((v, i) => odv.setUint32(i * 4, v, false));
-        return out;
-      }
-
-      const utf8 = (str) => new TextEncoder().encode(str);
-      const b64 = (bytes) => btoa(String.fromCharCode(...bytes));
-      const catBytes = (a, b) => {
-        const r = new Uint8Array(a.length + b.length);
-        r.set(a);
-        r.set(b, a.length);
-        return r;
-      };
-      const authString = (pw, salt, challenge) =>
-        b64(
-          sha256(catBytes(utf8(b64(sha256(utf8(pw + salt)))), utf8(challenge))),
-        );
-
-      const WS_URL = params.get("host") || "ws://127.0.0.1:4455";
-      const WS_PW = params.get("pw") || "";
-
-      function request(type, data) {
-        return new Promise((resolve, reject) => {
-          if (!wsReady) return reject(new Error("not identified"));
-          const id = "r" + ++reqId;
-          pendingReq.set(id, { resolve, reject });
-          ws.send(
-            JSON.stringify({
-              op: 6,
-              d: { requestType: type, requestId: id, requestData: data || {} },
-            }),
-          );
-        });
-      }
+        vertSceneUuid = null;
 
       /* Find the vertical canvas and the scene this overlay lives in, then
          bind the source items inside it. Retried on a timer rather than given
@@ -2027,332 +1417,60 @@
           });
       }
 
-      function connect() {
-        try {
-          ws = new WebSocket(WS_URL);
-        } catch (_) {
-          return scheduleReconnect();
-        }
-
-        ws.onclose = () => {
-          wsReady = false;
+      /* ================================================================
+   PAGE HOOKS — what core/ needs from this page (core/README.md).
+   ================================================================ */
+      const PAGE = {
+        label: "vertical",
+        host: VERT_SCENE,
+        hostKey: () => (vertSceneUuid ? { sceneUuid: vertSceneUuid } : null),
+        /* Canvas and scene first; resolveVerticalScene binds the items once
+           it has the uuid. */
+        onIdentified: () => resolveVerticalScene(),
+        onClosed: () => {
           vertSceneUuid = null;
-          pendingReq.clear();
-          hud("websocket: closed", true);
-          scheduleReconnect();
-        };
-        ws.onerror = () => {}; /* onclose always follows; handle it there */
-
-        ws.onmessage = (ev) => {
-          const msg = JSON.parse(ev.data);
-
-          if (msg.op === 0) {
-            /* General | Scenes | Inputs — Inputs for Browser's mute. */
-            const d = { rpcVersion: 1, eventSubscriptions: 1 | 4 | 8 };
-            if (msg.d.authentication) {
-              if (!WS_PW) {
-                hud("websocket: server wants a password, none given", true);
-                return ws.close();
-              }
-              d.authentication = authString(
-                WS_PW,
-                msg.d.authentication.salt,
-                msg.d.authentication.challenge,
-              );
-            }
-            ws.send(JSON.stringify({ op: 1, d }));
-            return;
-          }
-
-          if (msg.op === 2) {
-            wsReady = true;
-            backoff = 1000;
-            hud("websocket: identified");
-            /* No canvasUuid: this is the MAIN canvas's program scene, which is
-               what drives the pan. */
-            request("GetSceneList")
-              .then((r) =>
-                applyScene(r.currentProgramSceneName, "websocket/seed"),
-              )
-              .catch(() => {});
-            resolveVerticalScene();
-            request("GetInputMute", { inputName: BROWSER })
-              .then((r) => setBrowserLive(!r.inputMuted))
-              .catch(() => setBrowserLive(false));
-            return;
-          }
-
-          if (msg.op === 5) {
-            const e = msg.d.eventData || {};
-            if (msg.d.eventType === "CurrentProgramSceneChanged")
-              applyScene(e.sceneName, "websocket");
-            else if (e.inputName === BROWSER) {
-              if (msg.d.eventType === "InputMuteStateChanged")
-                setBrowserLive(!e.inputMuted);
-              else if (msg.d.eventType === "InputRemoved") setBrowserLive(false);
-            }
-            return;
-          }
-
-          if (msg.op === 9) return; /* RequestBatchResponse — fire and forget */
-
-          if (msg.op === 7) {
-            const pr = pendingReq.get(msg.d.requestId);
-            if (!pr) return;
-            pendingReq.delete(msg.d.requestId);
-            if (msg.d.requestStatus.result)
-              pr.resolve(msg.d.responseData || {});
-            else pr.reject(new Error(msg.d.requestStatus.comment || "failed"));
-          }
-        };
-      }
-
-      function scheduleReconnect() {
-        setTimeout(connect, backoff);
-        backoff = Math.min(backoff * 2, 8000);
-      }
-
-      connect();
-
-      /* ================================================================
-   SOURCE PLACEMENT
-
-   Same rules as the horizontal page, addressed by sceneUuid instead of
-   sceneName. These are DIFFERENT scene items from COMIC's, referencing
-   the same inputs, so the two overlays cannot fight over a transform —
-   verified on OBS 32.2.2.
-   ================================================================ */
-      function loadItemIds({ quiet = false } = {}) {
-        if (!vertSceneUuid) return;
-        request("GetSceneItemList", { sceneUuid: vertSceneUuid })
-          .then((r) => {
-            itemIds.clear();
-            itemOn.clear();
-            r.sceneItems.forEach((i) => {
-              itemIds.set(i.sourceName, i.sceneItemId);
-              itemOn.set(i.sourceName, i.sceneItemEnabled !== false);
-              /* A source that has not produced a frame yet reports 0 — left
-                 out so fillTransform falls back until it has. */
-              const t = i.sceneItemTransform || {};
-              if (t.sourceWidth > 0 && t.sourceHeight > 0)
-                srcSize.set(i.sourceName, {
-                  w: t.sourceWidth,
-                  h: t.sourceHeight,
-                });
-            });
-            const missing = [...managed].filter((n) => !itemIds.has(n));
-            if (missing.length || !quiet)
-              hud(
-                missing.length
-                  ? `sources missing from ${VERT_SCENE}: ${missing.join(", ")}`
-                  : `sources bound: ${[...managed].join(", ")}`,
-                missing.length > 0,
-              );
-            /* Rebind if the scene is not fully populated yet. The horizontal
-               overlay can assume COMIC is complete before it loads, because
-               COMIC is on program the moment OBS starts. This page cannot:
-               obs-setup --vertical creates OverlayV as the FIRST item in a new
-               VCOMIC and adds Game / Cam / Chat after it, so a boot in that
-               window binds an item list with none of them in it — and without
-               this, nothing would rebind until the next scene change, leaving
-               the vertical canvas showing comic art over empty holes. */
-            if (missing.length)
-              setTimeout(() => loadItemIds({ quiet: true }), 3000);
-            syncVisibility();
-            startTracking(120); /* place them once, without waiting for a pan */
-          })
-          .catch(() => {
-            hud(`cannot read ${VERT_SCENE} item list`, true);
-            /* The scene was renamed or removed under us. Re-resolve. */
-            vertSceneUuid = null;
-            resolveTimer = setTimeout(resolveVerticalScene, 4000);
-          });
-      }
-
-      /* No pan: the same hole changes feed. Re-read the item list so a
-         Browser added after boot binds, with the size its crop needs. */
-      function setBrowserLive(live) {
-        if (live === browserLive) return;
-        browserLive = live;
-        hud(`browser ${live ? "on air" : "off air"}`);
-        if (wsReady) loadItemIds({ quiet: true });
-      }
-
-      function sendBatch(requests) {
-        ws.send(
-          JSON.stringify({
-            op: 8,
-            d: {
-              requestId: "b" + ++reqId,
-              haltOnFailure: false,
-              executionType: 0,
-              requests,
-            },
-          }),
-        );
-      }
-
-      /* Crop to the opening's aspect, then stretch. SCALE_OUTER fits without
-         distorting but spills the excess past the bounds box, and spill that
-         lands in ANOTHER punched hole is not something a mask can hide. */
-      function fillTransform(r, s) {
-        const t = {
-          positionX: r.x,
-          positionY: r.y,
-          alignment: 5 /* top-left, so position IS the rect corner */,
-          rotation: 0,
-          boundsAlignment: 0,
-          boundsWidth: Math.max(1, r.w),
-          boundsHeight: Math.max(1, r.h),
-        };
-
-        if (!s) {
-          t.boundsType = "OBS_BOUNDS_SCALE_OUTER";
-          /* A crop left over from when this source DID have a size would still
-             apply, and SCALE_OUTER would fit the cropped frame. */
-          t.cropLeft = t.cropRight = t.cropTop = t.cropBottom = 0;
-          return t;
-        }
-
-        const want = Math.max(1, r.w) / Math.max(1, r.h);
-        let cx = 0,
-          cy = 0;
-        if (s.w / s.h > want) cx = Math.round((s.w - s.h * want) / 2);
-        else cy = Math.round((s.h - s.w / want) / 2);
-
-        /* OBS rejects a crop that leaves nothing, and a 1px rounding error at
-           an extreme aspect would do exactly that. */
-        cx = Math.min(cx, Math.floor((s.w - 2) / 2));
-        cy = Math.min(cy, Math.floor((s.h - 2) / 2));
-
-        t.boundsType = "OBS_BOUNDS_STRETCH";
-        t.cropLeft = t.cropRight = Math.max(0, cx);
-        t.cropTop = t.cropBottom = Math.max(0, cy);
-        return t;
-      }
-
-      function pushRects(rects) {
-        if (!wsReady || !vertSceneUuid || !itemIds.size) return;
-        const reqs = [];
-        rects.forEach((r) => {
-          if (!punched.has(r.hole)) return;
-          const src = feed(r.src);
-          const id = itemIds.get(src);
-          if (!id) return;
-          reqs.push({
-            requestType: "SetSceneItemTransform",
-            requestData: {
-              sceneUuid: vertSceneUuid,
-              sceneItemId: id,
-              sceneItemTransform: fillTransform(r, srcSize.get(src)),
-            },
-          });
-        });
-        if (reqs.length) sendBatch(reqs);
-      }
-
-      /* Sources the live panel does not use are parked wholly outside the
-         canvas, not switched off — disabling deactivates the source and coming
-         back costs a capture re-hook. CLAUDE.md §2. */
-      const PARK = {
-        positionX: CANVAS_W + 200,
-        positionY: CANVAS_H + 200,
-        alignment: 5,
-        rotation: 0,
-        boundsType: "OBS_BOUNDS_STRETCH",
-        boundsAlignment: 0,
-        boundsWidth: 16,
-        boundsHeight: 9,
-      };
-
-      function syncVisibility() {
-        if (!wsReady || !vertSceneUuid || !itemIds.size) return;
-        const used = new Set([...punched].map((h) => feed(h.src)));
-        const reqs = [];
-        itemIds.forEach((id, name) => {
-          if (!managed.has(name) && name !== BROWSER) return;
-          if (itemOn.get(name) === false) {
-            reqs.push({
-              requestType: "SetSceneItemEnabled",
-              requestData: {
-                sceneUuid: vertSceneUuid,
-                sceneItemId: id,
-                sceneItemEnabled: true,
-              },
-            });
-            itemOn.set(name, true);
-          }
-          if (!used.has(name))
-            reqs.push({
-              requestType: "SetSceneItemTransform",
-              requestData: {
-                sceneUuid: vertSceneUuid,
-                sceneItemId: id,
-                sceneItemTransform: PARK,
-              },
-            });
-        });
-        if (reqs.length) sendBatch(reqs);
-      }
-
-      /* ================================================================
-   DEBUG HUD — ?debug=1
-   ================================================================ */
-      const hudEl = document.getElementById("hud"),
-        hudState = document.getElementById("hudState"),
-        hudRects = document.getElementById("hudRects"),
-        hudLog = document.getElementById("hudLog");
-      const hudLines = [];
-
-      function hud(msg, warn) {
-        if (!DEBUG) return;
-        const t = new Date().toTimeString().slice(0, 8);
-        hudLines.push(
-          `<span class="${warn ? "warn" : ""}">${t}  ${msg}</span>`,
-        );
-        while (hudLines.length > 8) hudLines.shift();
-        hudLog.innerHTML = hudLines.join("\n");
-        paintState();
-      }
-
-      function paintState() {
-        hudState.textContent =
-          `scene   ${currentScene || "—"}\n` +
-          `panel   ${current || "—"}\n` +
-          `socket  ${wsReady ? "identified" : "down"}\n` +
+        },
+          /* Rebind if the scene is not fully populated yet. The horizontal
+             overlay can assume COMIC is complete before it loads, because
+             COMIC is on program the moment OBS starts. This page cannot:
+             obs-setup --vertical creates OverlayV as the FIRST item in a new
+             VCOMIC and adds Game / Cam / Chat after it, so a boot in that
+             window binds an item list with none of them in it — and without
+             this, nothing would rebind until the next scene change, leaving
+             the vertical canvas showing comic art over empty holes. */
+        onItemsMissing: () =>
+          setTimeout(() => loadItemIds({ quiet: true }), 3000),
+        /* The scene was renamed or removed under us. Re-resolve. */
+        onItemsFailed: () => {
+          vertSceneUuid = null;
+          resolveTimer = setTimeout(resolveVerticalScene, 4000);
+        },
+        hudState: () =>
           `canvas  ${vertCanvasUuid ? vertCanvasUuid.slice(0, 8) : "—"}\n` +
-          `vscene  ${vertSceneUuid ? VERT_SCENE : "unresolved"}\n` +
-          `items   ${itemIds.size ? [...itemIds.keys()].join(" ") : "—"}\n` +
-          `obsapi  ${window.obsstudio ? "present" : "absent"}\n`;
+          `vscene  ${vertSceneUuid ? VERT_SCENE : "unresolved"}\n`,
+      };
+    </script>
+    <script src="../../core/socials.js"></script>
+    <script src="../../core/panel-page.js"></script>
+    <script src="../../core/obs-link.js"></script>
+    <script src="../../core/holes.js"></script>
+    <script src="../../core/camera-pan.js"></script>
+    <script src="../../core/hud.js"></script>
+    <script>
+      /* ================================================================
+   BOOT — after every core file, so nothing below can reach a
+   declaration that has not been evaluated yet. No obsstudio seed here:
+   the websocket is this page's primary path (OBS WIRING above).
+   ================================================================ */
+      if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(fitTagsToSafeArea);
+      } else {
+        fitTagsToSafeArea();
       }
-
-      function paintRects(rects) {
-        hudRects.innerHTML =
-          "\n" +
-          rects
-            .map(
-              (r) =>
-                `<span class="${r.visible ? "" : "off"}">` +
-                `${r.key.padEnd(12)}` +
-                `x:${r.x.toFixed(0).padStart(6)} y:${r.y.toFixed(0).padStart(6)} ` +
-                `w:${r.w.toFixed(0).padStart(5)} h:${r.h.toFixed(0).padStart(5)} ` +
-                `${r.visible ? "SEND" : "skip"}</span>`,
-            )
-            .join("\n") +
-          "\n";
-      }
-
-      if (DEBUG) {
-        hudEl.removeAttribute("hidden");
-        paintState();
-        hud(`vertical up — ${window.obsstudio ? "inside OBS" : "browser"}`);
-        /* Keys 1-9 for testing outside OBS. There is no keyboard in a browser
-           source, so this is dead weight on a live overlay. */
-        document.addEventListener("keydown", (e) => {
-          const n = Number(e.key);
-          if (n >= 1 && n <= PANELS.length) goTo(String(n));
-        });
-      }
+      applyPunch(-1); /* nothing live yet — page fully opaque */
+      listenObsStudio();
+      connect();
+      startHud();
     </script>
   </body>
 </html>

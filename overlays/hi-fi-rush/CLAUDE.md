@@ -130,8 +130,8 @@ video behind the mascot's own alpha instead of comic art.
 Paper cut-outs, one per platform, in `assets/socials/*.svg` at the repo root — scissor-faceted paper,
 inked edge, taped, logo glued on with a hard shadow. Kick is `thedeepeffect`,
 Twitch and YouTube share `thedeepeffect_`, Instagram is `@thedeepeffect__` —
-three labels. `SOCIALS` is duplicated in `overlay.html` and `vertical.html`
-(the pages share no code), so a handle change is two edits.
+three labels. The handles live once, in `core/contract.js`, and both pages
+read them through `core/socials.js` — a handle change is one edit.
 
 Each scene panel carries a `socials` entry. They are sized in **canvas px** via
 `--u = 1 / restScale(p)`, because panels rest at 0.33× to 1.17× and page-px sizes

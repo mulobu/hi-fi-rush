@@ -1249,8 +1249,9 @@ Real ceiling is encoder sessions — mix NVENC and QuickSync/x264 across outputs
 6m. ✅ One repo for every overlay — `Overlays/` is the root, the comic page is
     `overlays/hi-fi-rush/`, shared parts stay at the root. No behaviour change,
     read back off OBS 2026-11-01 (ADR 0002, 0008)
-6n. ⬜ Shared page code into `core/`, out of `overlay.html` and `vertical.html`
-    (ADR 0006)
+6n. ✅ Shared page code into `core/`, out of `overlay.html` and `vertical.html`;
+    pages plug in through a `PAGE` hooks object. All twelve punch sets read
+    back unchanged, 2026-11-01 (ADR 0006, 0009)
 6o. ⬜ `overlay.json` and `--overlay`: one scene collection per overlay, the
     mascot optional and renamed `Mascot` / `MascotV` (ADR 0003–0005)
 6p. ⬜ `overlays/_template/`, then the second show's overlay

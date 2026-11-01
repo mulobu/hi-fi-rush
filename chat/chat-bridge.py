@@ -97,7 +97,7 @@ SILENCE_LIMIT = 95.0
 # Your own accounts are never read back to you. Compared with everything but
 # letters and digits squashed out, so the Kick handle `thedeepeffect`, the
 # Twitch/YouTube `thedeepeffect_`, and a YouTube channel name like "The Deep
-# Effect" are all one entry. Same handles as SOCIALS in overlay.html.
+# Effect" are all one entry. Same handles as `socials` in core/contract.js.
 OWN_NAMES = {"thedeepeffect"}
 
 # The channel YouTubeChat reads when Restream cannot. Same handle as SOCIALS.

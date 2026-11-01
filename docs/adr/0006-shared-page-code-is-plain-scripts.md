@@ -1,7 +1,7 @@
 # 0006 — Shared page code is plain scripts
 
 - **Date:** 2026-11-01
-- **Status:** Accepted, not built (step 6n in `CLAUDE.md` §7)
+- **Status:** Accepted, built 2026-11-01 — refined by [0009](0009-pages-plug-into-core-through-page-hooks.md)
 
 ## Context
 

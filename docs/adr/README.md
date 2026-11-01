@@ -10,9 +10,10 @@ is — and why it changed.
 | [0003](0003-one-scene-collection-per-overlay.md) | One scene collection per overlay; profiles stay per Restream setup | 2026-11-01 | Accepted, not built |
 | [0004](0004-one-contract-for-every-overlay.md) | One set of scene and source names for every overlay | 2026-11-01 | Accepted, not built |
 | [0005](0005-mascot-is-optional-and-generic.md) | The mascot is optional, and its sources are `Mascot` / `MascotV` | 2026-11-01 | Accepted, not built |
-| [0006](0006-shared-page-code-is-plain-scripts.md) | Shared page code is plain scripts | 2026-11-01 | Accepted, not built |
+| [0006](0006-shared-page-code-is-plain-scripts.md) | Shared page code is plain scripts | 2026-11-01 | Accepted, built |
 | [0007](0007-holes-are-each-overlays-design.md) | Holes are each overlay's design; the pipeline's rules are shared | 2026-11-01 | Accepted |
 | [0008](0008-migrate-in-verified-steps.md) | Migrate in verified steps | 2026-11-01 | Accepted, step 2 done |
+| [0009](0009-pages-plug-into-core-through-page-hooks.md) | Pages plug into `core/` through one `PAGE` object | 2026-11-01 | Accepted, built |
 
 Decisions taken before 2026-11-01 are in the table in `CLAUDE.md` §3, with
 their reasoning in §2. They are not back-filled here.
