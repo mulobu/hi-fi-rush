@@ -180,11 +180,11 @@ something.
      replacing `YOUR_PASSWORD`:
 
      ```
-     file:///path/to/hi-fi%20rush/obs-test.html?pw=YOUR_PASSWORD
+     file:///path/to/Overlays/tools/obs-test.html?pw=YOUR_PASSWORD
      ```
 
-     The `%20` is the space in "hi-fi rush". Leave it encoded — a literal space
-     makes the source load nothing and show white. `tools/obs-setup.py` builds
+     If any folder on that path has a space in it, write it as `%20` — a
+     literal space makes the source load nothing and show white. `tools/obs-setup.py` builds
      this string for you from wherever the repo actually sits, which is why the
      script is the easier path.
    - **Width** `1920`, **Height** `1080`.

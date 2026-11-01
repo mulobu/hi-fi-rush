@@ -5,7 +5,7 @@
     "1080x1920 vertical canvas, not the 1920x1080 main one.",
     "",
     "Loaded by the DeerV browser source in VCOMIC:",
-    "  http://127.0.0.1:4460/mascot.html?set=deer&place=placement-vertical.json",
+    "  http://127.0.0.1:4460/mascot/mascot.html?set=deer&overlay=hi-fi-rush&place=placement-vertical.json",
     "mascot.html needed no changes for this -- it already takes `place`, and it",
     "derives every bound from innerWidth/innerHeight rather than assuming 16:9.",
     "",
@@ -29,7 +29,7 @@
     "        the panel edge. It is the first to drop if it reads badly.",
     "",
     "Re-author by dragging, same as the horizontal file:",
-    "  http://127.0.0.1:4460/mascot.html?set=deer&place=placement-vertical.json&edit=1",
+    "  http://127.0.0.1:4460/mascot/mascot.html?set=deer&overlay=hi-fi-rush&place=placement-vertical.json&edit=1",
     "in OBS via right-click -> Interact, then paste the JSON it prints."
   ],
 

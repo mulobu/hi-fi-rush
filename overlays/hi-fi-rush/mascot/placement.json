@@ -9,7 +9,7 @@
     "top-left and it is not its centre.",
     "",
     "A scene with no entry here hides the mascot. Author these by dragging:",
-    "  http://127.0.0.1:4460/mascot.html?set=deer&edit=1",
+    "  http://127.0.0.1:4460/mascot/mascot.html?set=deer&overlay=hi-fi-rush&edit=1",
     "in OBS via right-click -> Interact, then paste the JSON it prints."
   ],
 

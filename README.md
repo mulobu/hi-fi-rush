@@ -1,24 +1,38 @@
-# Comic Page OBS Overlay
+# Overlays
 
-Hi-Fi Rush inspired stream overlay. The whole stream is one comic page; each OBS
-scene is one panel, and switching scenes pans the camera across the page.
+Stream overlays for OBS, one per show. The shared parts — OBS wiring, chat TTS,
+the mascot, the tools — live at the root; each overlay's own design lives in
+`overlays/<name>/`. Scene and source names are the same in every overlay, so
+one deck drives every show.
 
-| File | What it is |
+| Overlay | What it is |
 | --- | --- |
-| [CLAUDE.md](CLAUDE.md) | Architecture, panel layout, art direction, decisions |
-| [OBS-SETUP.md](OBS-SETUP.md) | Scene/source wiring in OBS, by hand |
+| [overlays/hi-fi-rush/](overlays/hi-fi-rush/) | Hi-Fi Rush inspired. The whole stream is one comic page; each OBS scene is one panel, and switching scenes pans the camera across the page |
+
+| Path | What it is |
+| --- | --- |
+| [CLAUDE.md](CLAUDE.md) | Architecture, decisions, reliability — everything overlays share |
+| [docs/adr/](docs/adr/) | Decision records, one dated file per decision |
+| [docs/OBS-SETUP.md](docs/OBS-SETUP.md) | Scene/source wiring in OBS, by hand |
 | [tools/obs-setup.py](tools/obs-setup.py) | The same wiring, asserted over obs-websocket |
-| [obs/comic-scenes.json](obs/comic-scenes.json) | Exported scene collection, credentials stripped |
-| [overlay.html](overlay.html) | The live overlay. Point the browser source here |
-| [vertical.html](vertical.html) | The same engine, 1080×1920, for the vertical canvas |
-| [mockup.html](mockup.html) | Standalone layout mockup |
-| [obs-test.html](obs-test.html) | Scene-detection probe used to verify §2 |
+| [tools/obs-test.html](tools/obs-test.html) | Scene-detection probe used to verify §2 |
 | [tools/hero-asset.py](tools/hero-asset.py) | Turns a look-around video into a sprite sheet |
-| [mascot/](mascot/) | Cursor-following, scene-following mascot browser source |
-| [mascot/placement.json](mascot/placement.json) | Where the mascot sits, per scene |
-| [mascot/placement-vertical.json](mascot/placement-vertical.json) | The same, in the vertical canvas's pixels |
 | [start.py](start.py) | One command that starts everything a stream needs running |
 | [chat/](chat/) | Chat TTS: reads Restream chat aloud through OBS, with Piper |
+| [mascot/](mascot/) | Cursor-following, scene-following mascot browser source; sprite sets in `mascot/sets/` |
+| [assets/socials/](assets/socials/) | Platform icons every overlay's socials row loads |
+
+Inside each overlay folder:
+
+| Path | What it is |
+| --- | --- |
+| `overlay.html` | The live overlay. Point the browser source here |
+| `vertical.html` | The same engine, 1080×1920, for the vertical canvas |
+| `chat.css` | How the chat embed is styled to sit in the overlay's art |
+| `mascot/placement.json` | Where the mascot sits, per scene — only if the overlay has one |
+| `mascot/placement-vertical.json` | The same, in the vertical canvas's pixels |
+| `obs/scenes.json` | Exported scene collection, credentials stripped |
+| `CLAUDE.md`, `README.md` | The overlay's concept, art direction and panel layout |
 
 ---
 
@@ -53,8 +67,8 @@ not a command there: Windows ships a `py` launcher instead, and the bare names
 ## 2. Clone it
 
 ```bash
-git clone <your-repo-url> "hi-fi rush"
-cd "hi-fi rush"
+git clone <your-repo-url> Overlays
+cd Overlays
 ```
 
 ## 3. Turn on the websocket, once
@@ -350,10 +364,10 @@ hand later. Export the collection for that:
 python3 tools/obs-setup.py --export
 ```
 
-writes [obs/comic-scenes.json](obs/comic-scenes.json), sanitised and safe to
+writes [overlays/hi-fi-rush/obs/scenes.json](overlays/hi-fi-rush/obs/scenes.json), sanitised and safe to
 commit. On the new machine:
 
-1. OBS → **Scene Collection → Import** → pick `obs/comic-scenes.json`.
+1. OBS → **Scene Collection → Import** → pick `overlays/hi-fi-rush/obs/scenes.json`.
 2. Switch to the imported collection ("Comic Overlay").
 3. `python3 tools/obs-setup.py` — repairs the browser URLs, which the export
    deliberately left as tokens: two for `Overlay` and `Deer`, or four with
@@ -527,7 +541,7 @@ reconnects to the bridge by itself — start order does not matter.
 # Mascot
 
 A character that follows your cursor, as its own OBS browser source. It shares
-no code with [overlay.html](overlay.html) -- no imports, no globals, no reach
+no code with [overlay.html](overlays/hi-fi-rush/overlay.html) -- no imports, no globals, no reach
 into the comic page. The only fact the two have in common is the name of the
 OBS scene, which they each read for themselves. Add it, move it, hide it,
 delete it; the comic overlay never notices.
@@ -606,7 +620,7 @@ finds already listening alone.
 Only if you are not using `obs-setup.py`. A **Browser** source pointing at:
 
 ```
-http://127.0.0.1:4460/mascot.html?set=deer
+http://127.0.0.1:4460/mascot/mascot.html?set=deer&overlay=hi-fi-rush
 ```
 
 Set it to **1920x1080**, and uncheck **Shutdown source when not visible** so the
@@ -654,7 +668,7 @@ The three shipped spots:
 ### Authoring a new one
 
 ```
-http://127.0.0.1:4460/mascot.html?set=deer&edit=1
+http://127.0.0.1:4460/mascot/mascot.html?set=deer&overlay=hi-fi-rush&edit=1
 ```
 
 Right-click the `Deer` source in OBS → **Interact**, switch to the scene you
@@ -719,7 +733,7 @@ Keep the OBS Browser source full canvas, such as 1920x1080. Move the mascot
 inside the page instead of moving the OBS source itself:
 
 ```
-http://127.0.0.1:4460/mascot.html?set=deer&edit=1
+http://127.0.0.1:4460/mascot/mascot.html?set=deer&overlay=hi-fi-rush&edit=1
 ```
 
 Right-click the Browser source in OBS, choose **Interact**, drag the mascot, and
@@ -962,7 +976,7 @@ assets/deer/
   manifest.json   grid, cell size, degrees per frame
 ```
 
-Copy `sheet.webp` and `manifest.json` into `mascot/deer/` to ship them. That
+Copy `sheet.webp` and `manifest.json` into `mascot/sets/deer/` to ship them. That
 pair is all `mascot.html` loads -- it reads the sheet's filename out of the
 manifest. The `.png` and `frames/` are for looking at, and are gitignored.
 
