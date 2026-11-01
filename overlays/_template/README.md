@@ -14,7 +14,9 @@ game-below stack. No mascot.
    `mascot/` folder with `placement.json` and `placement-vertical.json` if it
    has one (copy them from `overlays/hi-fi-rush/mascot/` and re-author).
 3. Design: `PANELS`, `artFor`, the CSS. Keep each panel's border at 15px.
-   `chat.css` styles the chat embed to sit on your chat panel.
+   `chat.css` styles the chat embed to sit on your chat panel. The template
+   shows no socials and carries no icons: before giving a panel `socials`,
+   draw `assets/socials/<platform>.svg` for each platform in the contract.
 4. Build its collection — created on the first run, never while live:
 
    ```bash
@@ -46,5 +48,10 @@ source at a time, holes may nest but not partly overlap, the page is exactly
 the canvas size. The scene and source names are the shared ones
 ([core/contract.js](../../core/contract.js)), so the deck works unchanged.
 
-The `Chat` source is 800 × 938 in every collection and is cropped to each
-hole's shape; a very wide chat hole shows less chat.
+The `Chat` source is 800 × 938 unless `overlay.json` sets `"chat":
+{"width": W, "height": H}`, and it is cropped to each hole's shape. Size it to
+your chat hole and nothing is cropped
+([ADR 0015](../../docs/adr/0015-chat-source-sized-per-overlay.md)).
+
+`Cam` is the iPhone, 3840 × 2160: draw every cam hole 16:9, or the camera is
+cropped ([ADR 0014](../../docs/adr/0014-cam-is-the-iphone-camera.md)).

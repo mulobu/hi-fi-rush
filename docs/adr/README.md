@@ -16,6 +16,10 @@ is — and why it changed.
 | [0009](0009-pages-plug-into-core-through-page-hooks.md) | Pages plug into `core/` through one `PAGE` object | 2026-11-01 | Accepted, built |
 | [0010](0010-building-and-choosing-an-overlays-collection.md) | Building an overlay's collection, and choosing the day's show | 2026-11-01 | Accepted, built, live |
 | [0011](0011-new-overlays-start-from-the-template.md) | New overlays start from `overlays/_template/` | 2026-11-01 | Accepted, built, verified in OBS |
+| [0012](0012-social-icons-are-each-overlays-art.md) | Social icons are each overlay's art | 2026-11-02 | Accepted, built |
+| [0013](0013-money-talks-monday-smash-replaces-the-pan.md) | Money Talks Monday: the smash replaces the pan | 2026-11-02 | Accepted; both pages built, in OBS |
+| [0014](0014-cam-is-the-iphone-camera.md) | `Cam` is the iPhone camera, and cam cutouts are 16:9 | 2026-11-02 | Accepted, built |
+| [0015](0015-chat-source-sized-per-overlay.md) | The `Chat` source is sized per overlay | 2026-11-02 | Accepted, built |
 
 Decisions taken before 2026-11-01 are in the table in `CLAUDE.md` §3, with
 their reasoning in §2. They are not back-filled here.

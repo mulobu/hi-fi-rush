@@ -11,7 +11,7 @@ these files and the page see each other.
 | --- | --- |
 | `contract.js` | `OVERLAY_CONTRACT`: scene, host, source names, ports, social handles. Also read as JSON by `tools/obs-setup.py` and `start.py` |
 | `base.js` | `params`, `DEBUG` |
-| `socials.js` | `SOCIALS`, `SOCIAL_NAMES` (from the contract), `socialsFor()` |
+| `socials.js` | `SOCIALS`, `SOCIAL_NAMES` (from the contract), `socialsFor()`. Icons come from the page's own `assets/socials/<platform>.svg` |
 | `panel-page.js` | Builds the page from `PANELS`: skirts, panels, holes, their page-space geometry; the `#countdown` ticker |
 | `obs-link.js` | Scene detection (`applyScene`, `listenObsStudio`, `seedFromObsStudio`), the obs-websocket client (`connect`, `request`), and `mainPage()` |
 | `vertical.js` | For pages on the vertical canvas: the platform safe zones and `fitTagsToSafeArea`, finding the canvas and its scene by uuid, and `verticalPage()`. Load after `base.js` |
@@ -52,6 +52,10 @@ Before `socials.js`:
 | `SCENE_MAP` | Trigger scene name → panel id. Every scene in `OVERLAY_CONTRACT.scenes` should map |
 | `scaleFor(p)` | A panel's resting scale |
 | `artFor(p)` | The panel's art, as HTML. Tag an element `over` to lift it above the video |
+
+Beside the page, if any panel has `socials`: `assets/socials/<platform>.svg`,
+one per platform in the contract's `socials` (`kick`, `twitch`, `youtube`,
+`instagram`). They are the overlay's own art; no overlay loads another's.
 
 `PAGE` is how the page tells core which scene it drives and what to do when
 the connection changes. The boot script makes it with `mainPage(label)` (a

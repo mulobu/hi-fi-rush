@@ -127,7 +127,7 @@ video behind the mascot's own alpha instead of comic art.
 
 ### Socials
 
-Paper cut-outs, one per platform, in `assets/socials/*.svg` at the repo root — scissor-faceted paper,
+Paper cut-outs, one per platform, in this overlay's `assets/socials/*.svg` — scissor-faceted paper,
 inked edge, taped, logo glued on with a hard shadow. Kick is `thedeepeffect`,
 Twitch and YouTube share `thedeepeffect_`, Instagram is `@thedeepeffect__` —
 three labels. The handles live once, in `core/contract.js`, and both pages

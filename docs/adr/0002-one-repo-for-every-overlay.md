@@ -1,7 +1,7 @@
 # 0002 — One repo for every overlay
 
 - **Date:** 2026-11-01
-- **Status:** Accepted, built (step 2 of [0008](0008-migrate-in-verified-steps.md))
+- **Status:** Accepted, built (step 2 of [0008](0008-migrate-in-verified-steps.md)); the root `assets/socials/` superseded by [0012](0012-social-icons-are-each-overlays-art.md) (2026-11-02)
 
 ## Context
 

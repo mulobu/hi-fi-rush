@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Money Talks Monday — OBS</title>
+    <!--
+      Money Talks Monday: one banknote split across its middle. The top half
+      is the header, the bottom half the footer, and the video shows between
+      them. A scene switch is the smash (smash.js, docs/adr/0013): the white
+      borders rewind, the halves slam shut into the whole note, a Gandhi
+      coin spins in its empty rosette, and they open into the next frame.
+
+      Everything that talks to OBS is core/. This page is the design: the
+      note, the per-scene frames, the holes behind them, and the art on the
+      halves. The page of panels paints nothing — each panel is exactly the
+      canvas and only carries holes; every visible pixel is the #frame layer.
+      CLAUDE.md here has the design and the measurements.
+    -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Rozha+One&family=Cinzel:wght@600;800&family=Space+Mono:wght@700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="money.css" />
+    <style>
+      /* This page's canvas, and where its plates sit. Everything both pages
+         draw alike is money.css. */
+      :root {
+        --canvas-w: 1920px;
+        --canvas-h: 1080px;
+      }
+      .soc.band {
+        left: 32px;
+        top: 12px;
+      }
+      .live {
+        right: 32px;
+        top: 14px;
+      }
+      .t-game {
+        left: 1392px;
+        top: 984px;
+        width: 496px;
+        height: 78px;
+        gap: 4px;
+      }
+      .t-game b {
+        font-size: 40px;
+      }
+      .t-game span {
+        font-size: 17px;
+      }
+      .t-game em {
+        font-size: 20px;
+      }
+      /* CHAT's footer rises under the 16:9 cam, so it has the room. */
+      .t-chat {
+        left: 48px;
+        top: 822px;
+        width: 640px;
+        height: 170px;
+      }
+      .strap {
+        left: 40px;
+        top: 1008px;
+        width: 720px;
+        height: 58px;
+        gap: 4px;
+        padding-left: 22px;
+      }
+      .strap b {
+        font-size: 30px;
+      }
+      .strap span {
+        font-size: 14px;
+        letter-spacing: 0.3em;
+      }
+      .cart {
+        left: 70px;
+        top: 212px;
+        width: 452px;
+        height: 300px;
+      }
+      .serials {
+        left: 1350px;
+        top: 650px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="viewport" id="viewport">
+      <div class="shaker" id="shaker"><div class="page" id="page"></div></div>
+      <div id="frame"></div>
+    </div>
+
+    <div class="hud" id="hud" hidden>
+      <h4>MONEY TALKS DEBUG</h4>
+      <div id="hudState"></div>
+      <div id="hudRects"></div>
+      <div id="hudLog"></div>
+    </div>
+
+    <script src="../../core/contract.js"></script>
+    <script src="../../core/base.js"></script>
+    <script src="art.js"></script>
+    <script>
+      const CANVAS_W = 1920,
+        CANVAS_H = 1080;
+      /* The transition's sounds ride Overlay's audio into the mix. */
+      const SOUND = true;
+
+      /* ================================================================
+   THE NOTE. w and h are the file's own pixels; everything is sized
+   from them, so the 3840 x 2160 re-export only changes these numbers.
+   It is drawn BLEED past each side so the impact shake never shows an
+   edge. rosette: the centre of its empty medallion, as a fraction of
+   the image — where the coin spins. rotate: 0 here; the vertical page
+   turns the same file.
+   ================================================================ */
+      const NOTE = {
+        src: "assets/note.png",
+        w: 1774,
+        h: 887,
+        rotate: 0,
+        rosette: [0.5, 0.43],
+      };
+      const BLEED = 24,
+        NOTE_W = CANVAS_W + 2 * BLEED,
+        NOTE_H = (NOTE_W * NOTE.h) / NOTE.w,
+        NOTE_X = -BLEED; /* the drawn note's left edge on the canvas */
+      const COIN = {
+        x: NOTE_X + rosetteIn(NOTE)[0] * NOTE_W,
+        y: CANVAS_H / 2 - NOTE_H / 2 + rosetteIn(NOTE)[1] * NOTE_H,
+        r: 250,
+      };
+      /* END's camera window, centred on the rosette. 16:9, like every cam
+         cutout here: the camera is a 3840 x 2160 iPhone (docs/adr/0014),
+         and a window of any other shape crops it. */
+      const WINDOW = { w: 704, h: 396, r: 22 };
+
+      /* ================================================================
+   FRAMES — each scene's resting frame, in canvas px.
+     header  y of the header's bottom edge at the left and right
+     footer  the footer's white border, left to right
+     artFrom the first footer point the art starts at (GAME's cam
+             notch has no art: the camera fills it)
+     decor   art that stays put while the scene is on air, under the
+             halves: poly, a strip of the shut note; lines, white rules
+   Closed scenes are the whole note. GAME keeps the user's drawing —
+   slanted header, cam notch bottom-left, footer rising to the right —
+   with the bands slimmed and the notch made 16:9 (CLAUDE.md §3).
+   ================================================================ */
+      const FRAMES = {
+        game: {
+          open: true,
+          header: [92, 70],
+          footer: [
+            [0, 783],
+            [528, 783],
+            [528, 1010],
+            [1920, 944],
+          ],
+          artFrom: 2,
+        },
+        cam: {
+          open: true,
+          header: [84, 64],
+          footer: [
+            [0, 1000],
+            [1920, 976],
+          ],
+        },
+        chat: {
+          open: true,
+          header: [80, 62],
+          /* Under the cam the footer rises to meet it; the step follows the
+             divider's left edge, so its border and the divider's are one. */
+          footer: [
+            [0, 768],
+            [1248, 762],
+            [1237, 1004],
+            [1920, 990],
+          ],
+          /* Slanted strip of note between cam and chat, white on both long
+             edges. It covers the gap between the two holes, x 1280..1317,
+             at every open height. */
+          decor: {
+            poly: [
+              [1282, 0],
+              [1362, 0],
+              [1314, 1080],
+              [1234, 1080],
+            ],
+            lines: [
+              [1282, 0, 1234, 1080],
+              [1362, 0, 1314, 1080],
+            ],
+          },
+        },
+        start: { open: false },
+        brb: { open: false },
+        end: { open: false },
+      };
+
+      /* ================================================================
+   PANELS — one per scene, each exactly the canvas inside its 15px
+   border, side by side. They paint nothing; they exist for their
+   holes, which core punches and fills with OBS sources. Holes are
+   authored in canvas px and converted to core's percentages.
+
+   Every hole reaches under the frame's edges with room for the open's
+   small overshoot, so no gap ever shows between art and video.
+   ================================================================ */
+      const PANEL_SPACING = 2000;
+      const PAGE_W = 6 * PANEL_SPACING,
+        PAGE_H = CANVAS_H + 30;
+      const FAKE = { Game: "#1d2130", Cam: "#33283a", Chat: "#24323a" };
+      const hole = (src, x, y, w, h, bare) => ({
+        src,
+        x: (x / CANVAS_W) * 100,
+        y: (y / CANVAS_H) * 100,
+        w: (w / CANVAS_W) * 100,
+        h: (h / CANVAS_H) * 100,
+        bare: !!bare,
+        label: src,
+        c: FAKE[src],
+      });
+      const panel = (id, key, holes) => ({
+        id,
+        key,
+        cls: `p-${key}`,
+        x: (id - 1) * PANEL_SPACING,
+        y: 0,
+        w: CANVAS_W + 30,
+        h: CANVAS_H + 30,
+        rot: 0,
+        fit: "fill",
+        tag: key.toUpperCase(),
+        holes,
+      });
+      const PANELS = [
+        panel(1, "start", []),
+        /* Cam 1280 x 720, 16:9. Chat is overlay.json's "chat" size, 603 x
+           962, so its source fills the hole uncropped (docs/adr/0015). */
+        panel(2, "chat", [
+          hole("Cam", 0, 56, 1280, 720),
+          hole("Chat", 1317, 50, 603, 962),
+        ]),
+        /* The game is the whole frame and the bands cover its edges; the
+           cam hole sits inside it, so mergeCuts drops its cut. */
+        panel(3, "game", [
+          hole("Game", 0, 0, CANVAS_W, CANVAS_H, true),
+          hole("Cam", 0, 783, 528, 297),
+        ]),
+        panel(4, "cam", [hole("Cam", 0, 0, CANVAS_W, CANVAS_H, true)]),
+        panel(5, "brb", []),
+        /* The cam in the rosette, behind the frame's window mask. */
+        panel(6, "end", [
+          hole("Cam", COIN.x - WINDOW.w / 2, COIN.y - WINDOW.h / 2, WINDOW.w, WINDOW.h),
+        ]),
+      ];
+
+      const SCENE_MAP = {
+        START: 1,
+        CHAT: 2,
+        GAME: 3,
+        CAM: 4,
+        BRB: 5,
+        END: 6,
+      };
+
+      /* Every panel rests at 1:1. */
+      function scaleFor() {
+        return 1;
+      }
+      /* Panels carry no art: it is all on the frame. */
+      function artFor() {
+        return "";
+      }
+
+      /* ================================================================
+   ART ON THE HALVES — read by smash.js once SOCIALS exists, built from
+   art.js's pieces. Each group's x/y are canvas px with its half at rest
+   (open groups) or shut (closed groups). decor: art that does not move,
+   drawn under the halves for the scene it names.
+   ================================================================ */
+      function frameArt() {
+        const band = socialsRow("band plate");
+        return {
+          header: {
+            game: band + livePill(),
+            cam: band + livePill(),
+            chat: band + livePill(),
+            closed: closedCarts(),
+          },
+          footer: {
+            game: titlePlate("t-game"),
+            chat: titlePlate("t-chat"),
+            cam: strapPlate(),
+            closed: serialsPlate(),
+          },
+          decor: {},
+        };
+      }
+    </script>
+    <script src="../../core/socials.js"></script>
+    <script src="../../core/panel-page.js"></script>
+    <script src="../../core/obs-link.js"></script>
+    <script src="../../core/holes.js"></script>
+    <!-- In place of core/camera-pan.js: this overlay's transition. -->
+    <script src="smash.js"></script>
+    <script src="../../core/hud.js"></script>
+    <script>
+      /* BOOT — after every core file (core/README.md). */
+      const PAGE = mainPage("overlay");
+      if (!window.obsstudio) document.body.classList.add("preview");
+      applyPunch(-1); /* nothing live yet — the note is shut */
+      listenObsStudio();
+      seedFromObsStudio(0);
+      connect();
+      startHud();
+    </script>
+  </body>
+</html>

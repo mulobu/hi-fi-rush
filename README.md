@@ -8,6 +8,7 @@ one deck drives every show.
 | Overlay | What it is |
 | --- | --- |
 | [overlays/hi-fi-rush/](overlays/hi-fi-rush/) | Hi-Fi Rush inspired. The whole stream is one comic page; each OBS scene is one panel, and switching scenes pans the camera across the page |
+| [overlays/money-talks-monday/](overlays/money-talks-monday/) | The Monday show, themed on an Indian ₹2000 note. The frame is the note's two halves, and a switch slams them together around a spinning Gandhi coin. Both pages built and in OBS |
 | [overlays/_template/](overlays/_template/) | Not a show: the plain, working starting point for a new overlay. Its README has the steps |
 
 | Path | What it is |
@@ -22,7 +23,6 @@ one deck drives every show.
 | [start.py](start.py) | One command that starts everything a stream needs running |
 | [chat/](chat/) | Chat TTS: reads Restream chat aloud through OBS, with Piper |
 | [mascot/](mascot/) | Cursor-following, scene-following mascot browser source; sprite sets in `mascot/sets/` |
-| [assets/socials/](assets/socials/) | Platform icons every overlay's socials row loads |
 
 Inside each overlay folder:
 
@@ -34,6 +34,7 @@ Inside each overlay folder:
 | `mascot/placement.json` | Where the mascot sits, per scene — only if the overlay has one |
 | `mascot/placement-vertical.json` | The same, in the vertical canvas's pixels |
 | `obs/scenes.json` | Exported scene collection, credentials stripped |
+| `assets/socials/` | One icon per platform, `<platform>.svg`, drawn for this overlay |
 | `CLAUDE.md`, `README.md` | The overlay's concept, art direction and panel layout |
 
 ---

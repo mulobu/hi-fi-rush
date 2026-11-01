@@ -5,7 +5,9 @@
    core/README.md. */
 
       /* Platforms that share a handle share a label. The handles are the
-         brand's, not an overlay's: core/contract.js. */
+         brand's, not an overlay's: core/contract.js. The icons are the
+         overlay's: assets/socials/<platform>.svg beside the page, so each
+         show draws its own (docs/adr/0012). */
       const SOCIALS = OVERLAY_CONTRACT.socials;
       const SOCIAL_NAMES = OVERLAY_CONTRACT.socialNames;
 
@@ -21,7 +23,7 @@
               g.on
                 .map(
                   (n) =>
-                    `<img class="cut" src="../../assets/socials/${n}.svg" alt="${SOCIAL_NAMES[n]}">`,
+                    `<img class="cut" src="assets/socials/${n}.svg" alt="${SOCIAL_NAMES[n]}">`,
                 )
                 .join("") +
               `<span class="handle"><span>${g.handle}</span></span></div>` +

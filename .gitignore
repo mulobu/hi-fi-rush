@@ -4,11 +4,11 @@ __pycache__/
 *.pyc
 
 # ---------------------------------------------------------------------------
-# assets/ is shared brand plus the workshop; mascot/sets/<name>/ is the
-# shipped goods.
+# The root assets/ is the workshop, none of it committed; mascot/sets/<name>/
+# is the shipped goods. An overlay's own art -- its socials icons included
+# (docs/adr/0012) -- is in overlays/<name>/assets/ and IS committed.
 #
-# assets/socials/ is committed: the SVGs every overlay's socials row loads.
-# Everything else under assets/ is generated or scratch -- the camera LUTs
+# Everything under the root assets/ is generated or scratch -- the camera LUTs
 # tools/cam-grade.py writes to assets/luts/, the PNG socials renders, and the
 # input and scratch for tools/hero-asset.py: the plate, the 80-odd scrub
 # stills you flick through to find the loop points, the per-frame cells, the
@@ -25,11 +25,10 @@ __pycache__/
 # video is a one-off render. ~18 MB for the deer, to never have to recreate
 # the character. Everything derived from them stays out.
 #
-# `assets/*` rather than `assets/`, because git cannot re-include a file whose
-# parent directory is excluded -- with `assets/` excluded the ! line below
-# would silently do nothing.
-assets/*
-!assets/socials/
+# `/assets/`, not `assets/`: without the leading slash the pattern matches a
+# directory of that name at any depth, and would silently drop every
+# overlay's own assets/ with it.
+/assets/
 
 # The uncompressed sheet is a fallback nothing loads: mascot.html reads `sheet`
 # out of manifest.json, which names the webp. 9 MB for a spare.

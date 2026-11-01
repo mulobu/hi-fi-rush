@@ -3,17 +3,19 @@
 Stream overlays for OBS, one per show. What every overlay shares — the OBS
 wiring, the punch pipeline, audio, the deck, the vertical canvas, chat TTS,
 the mascot engine, the tools — is described here. Each overlay's own concept,
-art and layout lives in `overlays/<name>/CLAUDE.md`. There is one overlay so
-far, `overlays/hi-fi-rush/` — the comic page — and everything below was built
-for it, which is why its names (`COMIC`, panels, the page) run through it.
+art and layout lives in `overlays/<name>/CLAUDE.md`. The one live overlay is
+`overlays/hi-fi-rush/`, the comic page. Everything below was built for it,
+which is why its names (`COMIC`, panels, the page) run through it. The second,
+`overlays/money-talks-monday/` (the banknote), has both pages built and in OBS
+as its own collection (2026-11-02), not yet streamed.
 
 | Where | What |
 | --- | --- |
-| `overlays/<name>/` | One overlay: `overlay.json`, `overlay.html`, `vertical.html`, `chat.css`, `mascot/placement*.json`, `obs/scenes.json`, its own `CLAUDE.md`. `overlays/_template/` is where a new one starts |
+| `overlays/<name>/` | One overlay: `overlay.json`, `overlay.html`, `vertical.html`, `chat.css`, `mascot/placement*.json`, `obs/scenes.json`, `assets/` (its own art, socials icons included), its own `CLAUDE.md`. `overlays/_template/` is where a new one starts |
 | `core/` | The page code every overlay shares, and `contract.js`, the names they all use. `core/README.md` is the page contract |
 | `tools/obs-setup.py` | Builds and checks the OBS side; the deck runs it for CLIP and GO LIVE |
 | `start.py`, `chat/`, `mascot/` | Bridges, chat TTS, the mascot page and its sprite sets (`mascot/sets/`) |
-| `assets/` | Shared brand: `socials/` committed; LUTs and workshop scratch gitignored |
+| `assets/` | The workshop: LUTs and scratch, all gitignored. Nothing an overlay loads lives here |
 | `docs/adr/` | **Decision records.** Every decision from 2026-11-01 on, one dated file each |
 
 Sections keep their original numbers, so every `§N` still resolves: §1, §4 and §5 are the comic overlay's own and live in [`overlays/hi-fi-rush/CLAUDE.md`](overlays/hi-fi-rush/CLAUDE.md); §2, §3 and §6–§9 are here.
@@ -27,7 +29,7 @@ OBS scene: COMIC          <- the only real scene
 ├── Mascot    (Browser 1920x1080)   TOP — mascot, over the art; only if the overlay has one
 ├── Overlay   (Browser 1920x1080)         comic art, masks video spill
 ├── Chat      (Browser)
-├── Cam       (Video Capture Device)
+├── Cam       (iPhone, iOS Camera Source, 3840x2160 — ADR 0014)
 ├── Browser   (Window Capture of Chrome)  in Game's hole while unmuted
 ├── Game      (Game Capture on Windows; macOS Screen Capture on macOS)
 ├── Tts       (Browser 64x64, off-canvas)  chat TTS audio, draws nothing
@@ -1107,6 +1109,8 @@ it is accepted and not kept, so every run "added" the Discord duck again.
 | TTS monitoring   | Monitor and Output                     | Measured: OBS 32 dedups it out of Desktop Audio |
 | TTS blocklist    | Gitignored, required to start          | Personal and a list of slurs; a missing filter must be loud |
 | Launching        | `start.py` — bridges, then OBS         | One command; a job object so no bridge orphans |
+| Camera           | iPhone via iOS Camera Source; cam cutouts 16:9 (ADR 0014) | It is the only camera; any other hole shape crops it |
+| Chat source size | Per overlay, `overlay.json` `chat` (ADR 0015) | A browser source cropped to its hole loses text |
 
 ### Rejected, and why
 
@@ -1292,7 +1296,12 @@ Real ceiling is encoder sessions — mix NVENC and QuickSync/x264 across outputs
     2026-11-01: collection renamed `Hi-Fi Rush`, `Deer` → `Mascot`, re-exported
 6p. ✅ `overlays/_template/` and `core/vertical.js` (ADR 0011), built as its own
     collection and read back off OBS 2026-11-01; a fresh collection measured
-    (§2). ⬜ The second show's own overlay, once designed
+    (§2)
+6q. ⬜ Money Talks Monday, the second show's overlay. Designed 2026-11-02;
+    social icons per overlay (ADR 0012), its folder, both pages with
+    `smash.js`, and its OBS collection are done, read back off OBS. A mic, the
+    chat styling, its profile and `shows.json` remain: its own build order,
+    `overlays/money-talks-monday/CLAUDE.md` §4 (ADR 0013)
 7. ⬜ Failsafes + panic key
 8. ⬜ Alert layer + queue, Streamer.bot / EventSub feed
 9. ⬜ Self-host fonts, go live

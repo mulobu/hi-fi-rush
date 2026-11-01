@@ -1,0 +1,13 @@
+{
+  "_comment": [
+    "collection: the OBS scene collection this overlay lives in (docs/adr/0003).",
+    "  tools/obs-setup.py --overlay money-talks-monday creates it.",
+    "chat: the Chat source's size, equal to the CHAT hole in overlay.html,",
+    "  so the source fills it with nothing cropped (docs/adr/0015).",
+    "No mascot key: Gandhi lives in the coin, not the mascot engine",
+    "  (docs/adr/0005)."
+  ],
+  "name": "Money Talks Monday",
+  "collection": "Money Talks Monday",
+  "chat": { "width": 603, "height": 962 }
+}

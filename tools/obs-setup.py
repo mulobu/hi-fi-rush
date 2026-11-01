@@ -243,6 +243,13 @@ ENCODER_CHOICES = {
 }
 
 
+# The camera is an iPhone, through the iOS Camera Source plugin, for every
+# overlay (docs/adr/0014): 3840 x 2160, so every cam hole is drawn 16:9. A
+# machine without the plugin gets a Video Capture Device instead, and says so.
+CAM_KIND = "ios_camera_source"
+CAM_FALLBACK = "dshow_input"
+
+
 def stack(placeholders: bool):
     """The COMIC scene, bottom item first."""
     video = "color_source_v3" if placeholders else None
@@ -257,7 +264,7 @@ def stack(placeholders: bool):
         # Directly above Game, whose hole it borrows while it is on air; under
         # Cam, whose window sits inside the game panel. See BROWSER_SOURCE.
         (SRC["browser"], video or ("window_capture" if win else "screen_capture"), 0xFFE0A030),
-        (SRC["cam"], video or ("dshow_input" if win else "av_capture_input_v2"), 0xFF3C8BDA),
+        (SRC["cam"], video or (CAM_KIND if win else "av_capture_input_v2"), 0xFF3C8BDA),
         (SRC["chat"], video or "browser_source", 0xFFDA2624),
         (SRC["overlay"], "browser_source", None),
     ] + ([(SRC["mascot"], "browser_source", None)] if has_mascot() else [])
@@ -1173,13 +1180,18 @@ def browser_settings(name: str, pw: str) -> dict:
             "reroute_audio": True,
         }
     if name == SRC["chat"]:
-        # 800x938 is the chat hole's own aspect (2174 x 2550 page px). The
-        # source is cropped to that aspect before it is stretched, so any
-        # other shape throws away chat rather than letterboxing it.
+        # The source is cropped to its hole's aspect before it is stretched,
+        # so a source of any other shape throws chat away rather than
+        # letterboxing it. Each overlay therefore sizes it to its own chat
+        # hole in overlay.json's "chat" (docs/adr/0015); without one it is
+        # 800x938, the comic's hole (2174 x 2550 page px).
         # The hole is punched, so the widget's page is what shows -- a
         # transparent chat box would read as a black rectangle cut out of the
-        # panel. --peri is the chat panel's own background.
-        want = {"url": "about:blank", "width": 800, "height": 938,
+        # panel.
+        size = OVERLAY_CFG.get("chat") or {}
+        want = {"url": "about:blank",
+                "width": int(size.get("width", 800)),
+                "height": int(size.get("height", 938)),
                 "shutdown": False, "restart_when_active": False}
         css = chat_css()
         if css is not None:
@@ -1365,6 +1377,10 @@ def main() -> None:
                     % (name, inputs[name], kind)
                 )
             continue
+        if kind == CAM_KIND and kind not in kinds and CAM_FALLBACK in kinds:
+            plan.warn("%s: the iOS Camera Source plugin is not installed -- "
+                      "creating a %s instead" % (name, CAM_FALLBACK))
+            kind = CAM_FALLBACK
         if kind not in kinds:
             plan.warn("%s: this OBS has no %s input kind -- creating a colour "
                       "placeholder instead" % (name, kind))

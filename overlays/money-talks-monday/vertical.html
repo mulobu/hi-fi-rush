@@ -1,0 +1,418 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Money Talks Monday — Vertical</title>
+    <!--
+      Money Talks Monday on the vertical canvas: 1080 x 1920, driven by the
+      MAIN canvas's program scene, so one deck press moves both pages.
+      Finding the canvas, its scene and the platform safe zones is
+      core/vertical.js; the smash is the same smash.js as the horizontal
+      page, and what both draw alike is money.css and art.js.
+
+      Until there is portrait art the note is the landscape file turned a
+      quarter anticlockwise: its middle cut becomes the horizontal seam, and
+      it is drawn just wide enough, and shifted, that the rosette sits on
+      the centre line with the note still covering both edges. Everything is
+      centred on x 540.
+
+      The bands sit in TikTok's 140 top / 324 bottom no-text zones, so the
+      frame costs no usable space. Type stays inside SAFE_* (core/vertical.js):
+      x < 916, 140 < y < 1596. Every cam window is 16:9 (docs/adr/0014).
+    -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Rozha+One&family=Cinzel:wght@600;800&family=Space+Mono:wght@700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="money.css" />
+    <style>
+      /* This page's canvas, and where its plates sit — all centred on
+         x 540, inside the safe width. Everything both pages draw alike is
+         money.css. */
+      :root {
+        --canvas-w: 1080px;
+        --canvas-h: 1920px;
+      }
+      .mid {
+        left: 540px;
+        transform: translateX(-50%);
+      }
+
+      /* GAME and CHAT: title and LIVE on the band under the small cam,
+         socials in the footer. Title and LIVE side by side, the pair
+         centred: 500 + 20 + 106. */
+      .t-vstrip {
+        left: 227px;
+        width: 500px;
+        height: 72px;
+        gap: 3px;
+      }
+      .t-vstrip b {
+        font-size: 36px;
+      }
+      .t-vstrip span {
+        font-size: 15px;
+      }
+      .t-vstrip em {
+        font-size: 18px;
+      }
+      .live.l-vstrip {
+        left: 747px;
+      }
+      /* The band sits lower on GAME, whose stack is centred. */
+      .t-vstrip.at-game {
+        top: 678px;
+      }
+      .live.l-vstrip.at-game {
+        top: 696px;
+      }
+      .t-vstrip.at-chat {
+        top: 522px;
+      }
+      .live.l-vstrip.at-chat {
+        top: 540px;
+      }
+      .soc.band {
+        gap: 18px;
+      }
+      .soc.band .soc-item img {
+        width: 30px;
+        height: 30px;
+      }
+      .soc.band .handle {
+        font-size: 17px;
+      }
+      .soc.band.b-game {
+        top: 1384px;
+      }
+      .soc.band.b-chat {
+        top: 1532px;
+      }
+
+      /* CAM: the title on the header, the strap and socials on the footer. */
+      .t-vcam {
+        left: 164px;
+        top: 186px;
+        width: 752px;
+        height: 176px;
+      }
+      .t-vcam b {
+        font-size: 84px;
+      }
+      .t-vcam span {
+        font-size: 34px;
+      }
+      .t-vcam em {
+        font-size: 40px;
+      }
+      .live.l-vcam {
+        top: 388px;
+      }
+      .strap {
+        left: 164px;
+        top: 1094px;
+        width: 752px;
+        height: 92px;
+        gap: 6px;
+        align-items: center;
+      }
+      .strap b {
+        font-size: 46px;
+      }
+      .strap span {
+        font-size: 18px;
+        letter-spacing: 0.3em;
+      }
+      .socstack.v-cam {
+        top: 1214px;
+      }
+
+      /* Closed scenes: the words above the coin, the socials below it. */
+      .cart {
+        left: 170px;
+        top: 236px;
+        width: 740px;
+        height: 400px;
+      }
+      .cart .big {
+        font-size: 100px;
+      }
+      .cart .caps {
+        font-size: 30px;
+      }
+      .cart .count {
+        font-size: 64px;
+      }
+      .cart .sn {
+        font-size: 20px;
+      }
+      .cart .deva {
+        font-size: 30px;
+      }
+      .serials {
+        left: 540px;
+        top: 1270px;
+        transform: translateX(-50%);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="viewport" id="viewport">
+      <div class="shaker" id="shaker"><div class="page" id="page"></div></div>
+      <div id="frame"></div>
+    </div>
+
+    <div class="hud" id="hud" hidden>
+      <h4>MONEY TALKS VERTICAL DEBUG</h4>
+      <div id="hudState"></div>
+      <div id="hudRects"></div>
+      <div id="hudLog"></div>
+    </div>
+
+    <script src="../../core/contract.js"></script>
+    <script src="../../core/base.js"></script>
+    <script src="../../core/vertical.js"></script>
+    <script src="art.js"></script>
+    <script>
+      const CANVAS_W = 1080,
+        CANVAS_H = 1920;
+      /* Silent: OverlayV must not reroute audio, or every sound would reach
+         the mix twice (root CLAUDE.md §2). The horizontal page plays them. */
+      const SOUND = false;
+
+      /* ================================================================
+   THE NOTE, turned. The same file as the horizontal page, rotated a
+   quarter anticlockwise until portrait art exists; then this is a new
+   src, its w and h, rotate: 0 and its own rosette.
+
+   The turned rosette is 43% across, not half, so the note is drawn
+   just wide enough that, shifted to put the rosette on x 540, it still
+   reaches BLEED past both edges: 1312 wide, its left at x -24.
+   ================================================================ */
+      const NOTE = {
+        src: "assets/note.png",
+        w: 1774,
+        h: 887,
+        rotate: -90,
+        rosette: [0.5, 0.43],
+      };
+      const BLEED = 24,
+        ROSETTE = rosetteIn(NOTE),
+        REACH = CANVAS_W / 2 + BLEED,
+        NOTE_W = Math.max(CANVAS_W + 2 * BLEED, REACH / ROSETTE[0], REACH / (1 - ROSETTE[0])),
+        NOTE_H = NOTE.rotate
+          ? (NOTE_W * NOTE.w) / NOTE.h
+          : (NOTE_W * NOTE.h) / NOTE.w,
+        NOTE_X = CANVAS_W / 2 - ROSETTE[0] * NOTE_W;
+      const COIN = {
+        x: NOTE_X + ROSETTE[0] * NOTE_W,
+        y: CANVAS_H / 2 - NOTE_H / 2 + ROSETTE[1] * NOTE_H,
+        r: 270,
+      };
+      /* END's camera window on the rosette: 16:9, centred. Its right end
+         runs under the platforms' rail, which a picture may (SAFE_RIGHT). */
+      const WINDOW = { w: 880, h: 495, r: 24 };
+
+      /* ================================================================
+   FRAMES — as the horizontal page's (header y at left and right,
+   footer border left to right, decor), in this canvas's px. Face on
+   top, as the comic's vertical has it: every open scene stacks the
+   16:9 cam above whatever comes second.
+   ================================================================ */
+      /* GAME and CHAT put the cam small — a 640 x 360 window, still 16:9 —
+         in a band of note across the top, so what a phone viewer came for
+         gets the room. The band runs from the top edge (under the header,
+         so the header's bounce never shows a gap) down to just under the
+         title, 92px below the cam, where the game or chat begins.
+
+         camBand(top) is that band for a cam whose window starts at `top`.
+         GAME's whole stack — cam, title, game, socials — is centred in the
+         safe area, 140..1596. CHAT fills it, cam at the top. */
+      function camBand(top) {
+        const win = { x: 220, y: top, w: 640, h: 360 };
+        const low = top + win.h + 102; /* the band's bottom, at the left */
+        const bottom = (x) => low - (10 * x) / CANVAS_W;
+        return {
+          win,
+          bottom,
+          path:
+            `M0 0H${CANVAS_W}V${bottom(CANVAS_W)}L0 ${bottom(0)}Z` +
+            `M${win.x} ${win.y}h${win.w}v${win.h}h${-win.w}Z`,
+          frame: [
+            [win.x, win.y, win.x + win.w, win.y],
+            [win.x + win.w, win.y, win.x + win.w, win.y + win.h],
+            [win.x + win.w, win.y + win.h, win.x, win.y + win.h],
+            [win.x, win.y + win.h, win.x, win.y],
+          ],
+        };
+      }
+      /* GAME: 360 cam + 92 title + 608 game + socials = 1124 tall, centred
+         on the safe area's middle, 868. */
+      const GBAND = camBand(306),
+        GAME_Y = GBAND.bottom(CANVAS_W);
+      const CBAND = camBand(150);
+      /* The chat column: the Chat source's own 603:962, centred, ending
+         above the caption zone with room for the socials under it. */
+      const CHATWIN = { x: 253, y: 604, w: 574, h: 916 };
+      const FRAMES = {
+        game: {
+          open: true,
+          header: [142, 130],
+          footer: [
+            [0, GAME_Y + 602],
+            [1080, GAME_Y + 592],
+          ],
+          decor: {
+            path: GBAND.path,
+            lines: [...GBAND.frame, [0, GBAND.bottom(0), CANVAS_W, GBAND.bottom(CANVAS_W)]],
+          },
+        },
+        cam: {
+          open: true,
+          header: [478, 466],
+          footer: [
+            [0, 1062],
+            [1080, 1050],
+          ],
+        },
+        chat: {
+          open: true,
+          header: [142, 130],
+          /* Chat is a centred column in a notch: the footer runs along the
+             band's bottom, down the column's left side, under it, and up
+             its right side. Where it meets the band its border is the
+             band's edge. */
+          footer: [
+            [0, CBAND.bottom(0)],
+            [CHATWIN.x, CBAND.bottom(CHATWIN.x)],
+            [CHATWIN.x, 1514],
+            [CHATWIN.x + CHATWIN.w, 1514],
+            [CHATWIN.x + CHATWIN.w, CBAND.bottom(CHATWIN.x + CHATWIN.w)],
+            [CANVAS_W, CBAND.bottom(CANVAS_W)],
+          ],
+          decor: {
+            path: CBAND.path,
+            lines: [
+              ...CBAND.frame,
+              [CHATWIN.x, CBAND.bottom(CHATWIN.x), CHATWIN.x + CHATWIN.w, CBAND.bottom(CHATWIN.x + CHATWIN.w)],
+            ],
+          },
+        },
+        start: { open: false },
+        brb: { open: false },
+        end: { open: false },
+      };
+
+      /* ================================================================
+   PANELS — as the horizontal page's: one per scene, each exactly the
+   canvas inside its 15px border, side by side, painting nothing.
+   ================================================================ */
+      const PANEL_SPACING = 1200;
+      const PAGE_W = 6 * PANEL_SPACING,
+        PAGE_H = CANVAS_H + 30;
+      const FAKE = { Game: "#1d2130", Cam: "#33283a", Chat: "#24323a" };
+      const hole = (src, x, y, w, h, bare) => ({
+        src,
+        x: (x / CANVAS_W) * 100,
+        y: (y / CANVAS_H) * 100,
+        w: (w / CANVAS_W) * 100,
+        h: (h / CANVAS_H) * 100,
+        bare: !!bare,
+        label: src,
+        c: FAKE[src],
+      });
+      const panel = (id, key, holes) => ({
+        id,
+        key,
+        cls: `p-${key}`,
+        x: (id - 1) * PANEL_SPACING,
+        y: 0,
+        w: CANVAS_W + 30,
+        h: CANVAS_H + 30,
+        rot: 0,
+        fit: "fill",
+        tag: key.toUpperCase(),
+        holes,
+      });
+      const PANELS = [
+        panel(1, "start", []),
+        /* Chat is the Chat source's own 603:962 (overlay.json), at about
+           1:1, centred, and ending above the caption zone: it is all text. */
+        panel(2, "chat", [
+          hole("Cam", CBAND.win.x, CBAND.win.y, CBAND.win.w, CBAND.win.h),
+          hole("Chat", CHATWIN.x, CHATWIN.y, CHATWIN.w, CHATWIN.h),
+        ]),
+        /* The game at full width and its own 16:9: 1080 x 608 is the
+           biggest it can be on this canvas without cropping it. */
+        panel(3, "game", [
+          hole("Cam", GBAND.win.x, GBAND.win.y, GBAND.win.w, GBAND.win.h),
+          hole("Game", 0, GAME_Y, 1080, 608),
+        ]),
+        panel(4, "cam", [hole("Cam", 0, 456, 1080, 608)]),
+        panel(5, "brb", []),
+        panel(6, "end", [
+          hole("Cam", COIN.x - WINDOW.w / 2, COIN.y - WINDOW.h / 2, WINDOW.w, WINDOW.h),
+        ]),
+      ];
+
+      const SCENE_MAP = {
+        START: 1,
+        CHAT: 2,
+        GAME: 3,
+        CAM: 4,
+        BRB: 5,
+        END: 6,
+      };
+
+      function scaleFor() {
+        return 1;
+      }
+      function artFor() {
+        return "";
+      }
+
+      /* ================================================================
+   ART ON THE HALVES — as the horizontal page's. All type is inside
+   the safe zones; the bands' parts under platform chrome are art only.
+   ================================================================ */
+      function frameArt() {
+        const strip = (at) =>
+          titlePlate(`t-vstrip ${at}`) + livePill(`l-vstrip ${at}`);
+        return {
+          header: {
+            game: "",
+            chat: "",
+            cam: titlePlate("t-vcam") + livePill("l-vcam mid"),
+            closed: closedCarts(),
+          },
+          footer: {
+            game: socialsRow("band plate mid b-game"),
+            cam: strapPlate() + socialsStack("v-cam mid"),
+            chat: socialsRow("band plate mid b-chat"),
+            closed: serialsPlate(),
+          },
+          decor: { game: strip("at-game"), chat: strip("at-chat") },
+        };
+      }
+    </script>
+    <script src="../../core/socials.js"></script>
+    <script src="../../core/panel-page.js"></script>
+    <script src="../../core/obs-link.js"></script>
+    <script src="../../core/holes.js"></script>
+    <!-- In place of core/camera-pan.js: this overlay's transition. -->
+    <script src="smash.js"></script>
+    <script src="../../core/hud.js"></script>
+    <script>
+      /* BOOT — after every core file. No obsstudio seed: on the vertical
+         canvas the websocket is the primary path (core/vertical.js). */
+      const PAGE = verticalPage("vertical");
+      if (!window.obsstudio) document.body.classList.add("preview");
+      applyPunch(-1);
+      listenObsStudio();
+      connect();
+      startHud();
+    </script>
+  </body>
+</html>

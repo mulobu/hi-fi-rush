@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+  <!-- Money Talks Monday: an engraved medallion, one ink, hatched ground. -->
+  <defs><pattern id="h" width="4.5" height="4.5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="4.5" height="4.5" fill="#ffe3ef"/><line x1="0" y1="0" x2="0" y2="4.5" stroke="#6d0a35" stroke-width="1.1" stroke-opacity=".42"/></pattern></defs>
+  <circle cx="60" cy="60" r="56" fill="#ffe3ef" stroke="#6d0a35" stroke-width="4"/>
+  <circle cx="60" cy="60" r="51.5" fill="none" stroke="#6d0a35" stroke-width="1.2" stroke-dasharray="1.6 3.2"/>
+  <circle cx="60" cy="60" r="47" fill="url(#h)" stroke="#6d0a35" stroke-width="1.6"/>
+  <rect x="32" y="32" width="56" height="56" rx="17" fill="none" stroke="#ffe3ef" stroke-width="15"/>
+  <circle cx="60" cy="60" r="12.5" fill="none" stroke="#ffe3ef" stroke-width="15"/>
+  <rect x="32" y="32" width="56" height="56" rx="17" fill="none" stroke="#6d0a35" stroke-width="8"/>
+  <circle cx="60" cy="60" r="12.5" fill="none" stroke="#6d0a35" stroke-width="8"/>
+  <circle cx="77" cy="43" r="4.5" fill="#6d0a35"/>
+</svg>

@@ -1,0 +1,43 @@
+/* Money Talks Monday: chat as a bank passbook. obs-setup.py puts this on
+   `Chat`. The ruled margin is also the room the CHAT divider's slant takes:
+   up to ~45px of the hole's left edge sits under it, so no line starts
+   there. Same selectors as every overlay's chat.css -- which do not yet
+   reach the Restream embed (CLAUDE.md, Status). */
+/* Bigger type for phones. The vertical page shows this source at about
+   1:1, so the embed's own size is what a phone gets; zoom scales the whole
+   page and needs none of its markup. It applies on both canvases. */
+html {
+  zoom: 1.5;
+}
+body {
+  margin: 0;
+  overflow: hidden;
+  background:
+    linear-gradient(
+      90deg,
+      transparent 50px,
+      #d6336c 50px 52px,
+      transparent 52px 56px,
+      #d6336c 56px 58px,
+      transparent 58px
+    ),
+    #ffe9f2 !important;
+}
+yt-live-chat-header-renderer, #panel-pages, #show-more,
+yt-live-chat-banner-manager { display: none !important; }
+yt-live-chat-renderer, #chat, #contents, #item-list, #item-scroller, #items,
+yt-live-chat-item-list-renderer { background: transparent !important; }
+#item-scroller { overflow: hidden !important; }
+yt-live-chat-text-message-renderer {
+  font-family: Consolas, "Courier New", monospace !important;
+  font-size: 20px !important;
+  padding: 8px 14px 8px 68px !important;
+  border-bottom: 1px solid rgba(190, 24, 96, 0.3) !important;
+}
+yt-live-chat-text-message-renderer #author-name {
+  color: #6d0a35 !important;
+  font-weight: 700 !important;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+yt-live-chat-text-message-renderer #message { color: #2a0614 !important; }
