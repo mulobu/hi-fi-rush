@@ -148,6 +148,25 @@ body.preview .hole.punched .fake-source {
   position: absolute;
   background-size: 100% 100%;
   background-repeat: no-repeat;
+  /* Muted at rest, so the bright pink stops competing with the plates and
+     handles; full colour while the note moves (#frame.loud, smash.js).
+     The user's call, 2026-11-02: the pink is right for the sting, too loud
+     to sit under a scene. */
+  filter: saturate(0.78) brightness(0.89);
+  transition: filter 450ms ease;
+}
+#frame.loud .note {
+  filter: none;
+}
+/* The paper around the note -- the bands above and below it, shut --
+   mutes with it: #d292ad is --paper through the same filter. */
+.half,
+.strip {
+  transition: background-color 450ms ease;
+}
+#frame:not(.loud) .half,
+#frame:not(.loud) .strip {
+  background-color: #d292ad;
 }
 /* A group's box is the canvas: x and y inside it are canvas px at the
    half's resting position (smash.js sets each group's top). */
@@ -432,32 +451,6 @@ body.preview .hole.punched .fake-source {
     transform: none;
   }
 }
-.live {
-  position: absolute;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  padding: 0 15px 0 12px;
-  background: var(--ink-deep);
-  color: var(--white);
-  font: 800 19px var(--f-caps);
-  letter-spacing: 0.16em;
-  border-radius: 6px;
-  box-shadow: 0 0 0 3px var(--paper-light);
-}
-.live i {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: #ff5c9a;
-  animation: pulse 1.6s ease-in-out infinite;
-}
-@keyframes pulse {
-  50% {
-    opacity: 0.25;
-  }
-}
 
 /* Title plate on the footer's thick end, lettered like the numerals on
    a note; the CAM strap is the same plate as a news name strap. */
@@ -524,6 +517,38 @@ body.preview .hole.punched .fake-source {
 .cart .deva {
   margin-top: 12px;
   font: 400 24px/1.3 var(--f-deva);
+}
+/* Socials on two centred lines (art.js socialsPair). */
+.socpair {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 22px;
+}
+/* A centred row on the canvas, at the top its inline style gives: plates
+   inside it lose their own placement and sit side by side. */
+.vrow {
+  position: absolute;
+  left: 0;
+  width: var(--canvas-w);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 20px;
+}
+.vcol {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.vrow .plate {
+  position: relative;
+  left: auto;
+  top: auto;
+  right: auto;
+  transform: none;
 }
 /* Stacked socials: the closed scenes' panel fades with the scene's words;
    an open scene's stays. */

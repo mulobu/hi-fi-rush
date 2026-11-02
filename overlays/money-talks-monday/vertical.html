@@ -28,23 +28,16 @@
     />
     <link rel="stylesheet" href="money.css" />
     <style>
-      /* This page's canvas, and where its plates sit — all centred on
-         x 540, inside the safe width. Everything both pages draw alike is
-         money.css. */
+      /* This page's canvas, and how big its plates are. Every open scene's
+         plate sits in a centred row (.vrow, money.css) at a top the config
+         computes; everything both pages draw alike is money.css. */
       :root {
         --canvas-w: 1080px;
         --canvas-h: 1920px;
       }
-      .mid {
-        left: 540px;
-        transform: translateX(-50%);
-      }
 
-      /* GAME and CHAT: title and LIVE on the band under the small cam,
-         socials in the footer. Title and LIVE side by side, the pair
-         centred: 500 + 20 + 106. */
+      /* GAME and CHAT: the title on the band under the small cam. */
       .t-vstrip {
-        left: 227px;
         width: 500px;
         height: 72px;
         gap: 3px;
@@ -58,43 +51,9 @@
       .t-vstrip em {
         font-size: 18px;
       }
-      .live.l-vstrip {
-        left: 747px;
-      }
-      /* The band sits lower on GAME, whose stack is centred. */
-      .t-vstrip.at-game {
-        top: 678px;
-      }
-      .live.l-vstrip.at-game {
-        top: 696px;
-      }
-      .t-vstrip.at-chat {
-        top: 522px;
-      }
-      .live.l-vstrip.at-chat {
-        top: 540px;
-      }
-      .soc.band {
-        gap: 18px;
-      }
-      .soc.band .soc-item img {
-        width: 30px;
-        height: 30px;
-      }
-      .soc.band .handle {
-        font-size: 17px;
-      }
-      .soc.band.b-game {
-        top: 1384px;
-      }
-      .soc.band.b-chat {
-        top: 1532px;
-      }
 
-      /* CAM: the title on the header, the strap and socials on the footer. */
+      /* CAM: the title on the header, the strap on the footer. */
       .t-vcam {
-        left: 164px;
-        top: 186px;
         width: 752px;
         height: 176px;
       }
@@ -107,12 +66,7 @@
       .t-vcam em {
         font-size: 40px;
       }
-      .live.l-vcam {
-        top: 388px;
-      }
       .strap {
-        left: 164px;
-        top: 1094px;
         width: 752px;
         height: 92px;
         gap: 6px;
@@ -125,8 +79,22 @@
         font-size: 18px;
         letter-spacing: 0.3em;
       }
-      .socstack.v-cam {
-        top: 1214px;
+
+      /* Socials, set big enough to notice on a phone: 24px handles and
+         44px medallions, asked for on 2026-11-02 (they were 17 and 30). */
+      .socpair .handle,
+      .socstack .handle,
+      .serials .handle {
+        font-size: 24px;
+      }
+      .socpair .soc-item img,
+      .socstack .soc-item img,
+      .serials .soc-item img {
+        width: 44px;
+        height: 44px;
+      }
+      .socpair .soc {
+        gap: 28px;
       }
 
       /* Closed scenes: the words above the coin, the socials below it. */
@@ -248,14 +216,16 @@
           ],
         };
       }
-      /* GAME: 360 cam + 92 title + 608 game + socials = 1124 tall, centred
+      /* GAME: 360 cam + 92 title + 608 game + 18 + ~130 socials, centred
          on the safe area's middle, 868. */
-      const GBAND = camBand(306),
-        GAME_Y = GBAND.bottom(CANVAS_W);
+      const GBAND = camBand(264),
+        GAME_Y = GBAND.bottom(CANVAS_W),
+        GAME_SOC = GAME_Y + 608 + 18;
       const CBAND = camBand(150);
       /* The chat column: the Chat source's own 603:962, centred, ending
-         above the caption zone with room for the socials under it. */
-      const CHATWIN = { x: 253, y: 604, w: 574, h: 916 };
+         with room for the two lines of socials above the caption zone. */
+      const CHATWIN = { x: 277, y: 604, w: 526, h: 840 };
+
       const FRAMES = {
         game: {
           open: true,
@@ -287,8 +257,8 @@
           footer: [
             [0, CBAND.bottom(0)],
             [CHATWIN.x, CBAND.bottom(CHATWIN.x)],
-            [CHATWIN.x, 1514],
-            [CHATWIN.x + CHATWIN.w, 1514],
+            [CHATWIN.x, CHATWIN.y + CHATWIN.h - 4],
+            [CHATWIN.x + CHATWIN.w, CHATWIN.y + CHATWIN.h - 4],
             [CHATWIN.x + CHATWIN.w, CBAND.bottom(CHATWIN.x + CHATWIN.w)],
             [CANVAS_W, CBAND.bottom(CANVAS_W)],
           ],
@@ -338,8 +308,8 @@
       });
       const PANELS = [
         panel(1, "start", []),
-        /* Chat is the Chat source's own 603:962 (overlay.json), at about
-           1:1, centred, and ending above the caption zone: it is all text. */
+        /* Chat is the Chat source's own 603:962 (overlay.json), centred,
+           and ending above the caption zone: it is all text. */
         panel(2, "chat", [
           hole("Cam", CBAND.win.x, CBAND.win.y, CBAND.win.w, CBAND.win.h),
           hole("Chat", CHATWIN.x, CHATWIN.y, CHATWIN.w, CHATWIN.h),
@@ -377,23 +347,25 @@
    ART ON THE HALVES — as the horizontal page's. All type is inside
    the safe zones; the bands' parts under platform chrome are art only.
    ================================================================ */
+      /* A centred row of plates at canvas y `top` (money.css .vrow). */
+      const vrow = (top, html) => `<div class="vrow" style="top:${top}px">${html}</div>`;
+
       function frameArt() {
-        const strip = (at) =>
-          titlePlate(`t-vstrip ${at}`) + livePill(`l-vstrip ${at}`);
+        const band = (win) => vrow(win.y + win.h + 10, titlePlate("t-vstrip"));
         return {
           header: {
             game: "",
             chat: "",
-            cam: titlePlate("t-vcam") + livePill("l-vcam mid"),
+            cam: vrow(220, titlePlate("t-vcam")),
             closed: closedCarts(),
           },
           footer: {
-            game: socialsRow("band plate mid b-game"),
-            cam: strapPlate() + socialsStack("v-cam mid"),
-            chat: socialsRow("band plate mid b-chat"),
+            game: vrow(GAME_SOC, socialsPair("")),
+            cam: vrow(1094, strapPlate()) + vrow(1214, socialsStack("")),
+            chat: vrow(CHATWIN.y + CHATWIN.h + 14, socialsPair("")),
             closed: serialsPlate(),
           },
-          decor: { game: strip("at-game"), chat: strip("at-chat") },
+          decor: { game: band(GBAND.win), chat: band(CBAND.win) },
         };
       }
     </script>

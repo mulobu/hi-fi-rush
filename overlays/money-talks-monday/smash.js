@@ -550,6 +550,9 @@
           const g = ++gen;
           running = true;
           phase = "closing";
+          /* The note is at full colour only while it moves; at rest it is
+             muted so the plates and handles read over it (money.css). */
+          frame.classList.add("loud");
 
           /* Rewind, then slam: only from an open frame, and only as far as
              it still has to go — a press mid-open closes from where it is. */
@@ -627,6 +630,7 @@
               if (!ok.every(Boolean)) return;
             } else coinIdle(k === "start");
           }
+          frame.classList.remove("loud");
           running = false;
           phase = "idle";
         }
@@ -637,6 +641,7 @@
           gen++;
           running = false;
           phase = "idle";
+          frame.classList.remove("loud");
           switchTo(t);
           const k = keyOf(t),
             open = isOpen(k);

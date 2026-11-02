@@ -83,6 +83,20 @@ across its middle.
 outer edge), ink `#be1860` (its darkest 5%). Deep ink `#6d0a35` and light
 paper `#ffe3ef` are for text and plates.
 
+**Muted at rest, full colour in motion.** On 2026-11-02 the user found the
+bright pink right for the sting but too loud to sit under a scene. So the
+note is drawn through `saturate(0.78) brightness(0.89)` whenever a scene is
+settled, and the paper around it is that same colour, `#d292ad`. The first
+try, `saturate(0.55) brightness(0.78)`, read too dark; this is halfway back
+to full colour.
+`#frame.loud`, set by `smash.js` from the rewind until the scene settles,
+lifts both back to full colour over 450 ms. The plates, handles and the
+coin are not muted, so they now carry the eye.
+
+**No LIVE badge, anywhere.** There was one in every open scene's header
+(horizontal) and beside the title (vertical); the user had it removed on
+2026-11-02. The platforms already say live.
+
 **Fonts:** Rozha One for display and Devanagari, Cinzel for small capitals,
 Space Mono for serial numbers. They load from Google Fonts like the comic's,
 until step 9 self-hosts them.
@@ -161,7 +175,7 @@ cam (4:3), footer 970 → 820.
   the cam's top, down its right side, then up the slant.
 - **At rest each band shows the strip next to the cut**, not the note's outer
   border. The halves slide.
-- **Header:** LIVE and the socials.
+- **Header:** the socials.
 - **Footer:** its thick right end holds the title plate, "MONEY TALKS MONDAY",
   lettered like the numerals on a note.
 - **The game is never shrunk.** Its hole is the whole frame (`bare`) and the
@@ -311,35 +325,54 @@ first, as on the comic's vertical.
 2026-11-02, for phones).
 
 - **The cam:** a 640 × 360 window cut into a band of note (an evenodd
-  `path` decor, `camBand()`). The band also carries the title and LIVE
-  under it. On CHAT it starts at y 150, below TikTok's top bar.
+  `path` decor, `camBand()`). The band also carries the title under it.
+  On CHAT it starts at y 150, below TikTok's top bar.
 - **GAME's whole stack is centred** in the safe area, 140–1596: cam, title,
-  game and socials are one 1124 px block, 306–1430, around its middle, 868.
-  The user asked for that on 2026-11-02.
+  game and socials are one block, 264–1464, around its middle, 868. The user
+  asked for that on 2026-11-02.
+- **Socials are set for phones:** 24 px handles and 44 px medallions (they
+  were 17 and 30), on two centred lines under the game and the chat, and
+  stacked on CAM and the shut scenes.
+- **Every plate sits in a centred row** (`.vrow`) whose top the config
+  computes from the layout, so moving a scene moves its plates with it.
 - **The game:** 1080 × 608. That is its own 16:9 at the full width: the
   biggest it can be on a 1080-wide canvas without cropping, and 11% bigger
   than the template's 977 × 550. A 4:3 crop (1080 × 812) was tried and
   dropped the same day: the user wants the aspect kept.
-- **Chat:** a 574 × 916 column. `chat.css` zooms the chat page 1.5×, which
+- **Chat:** a 526 × 840 column, narrowed from 574 × 916 to make room for the
+  bigger socials. `chat.css` zooms the chat page 1.5×, which
   makes its type bigger without needing the embed's markup. The zoom applies
   on both canvases.
 
 | Scene | Layout |
 | --- | --- |
-| GAME | Header 142 → 130, art only. A centred stack: Cam 220,306 640 × 360 in the band, the title and LIVE under it, Game 0,758 1080 × 608, socials under the game (1384) |
-| CAM | Header down to 478 → 466, with the title and LIVE centred. Cam 0,456 1080 × 608. Footer from 1062 → 1050 with the name strap and stacked socials, centred |
-| CHAT | Cam and band as GAME's. Chat is a centred column, 253,604 574 × 916: the `Chat` source's own 603:962, and clear of the caption zone. The footer runs along the band, down the column's sides and under it, with the socials centred below (1532) |
+| GAME | Header 142 → 130, art only. A centred stack: Cam 220,264 640 × 360 in the band, the title under it, Game 0,716 1080 × 608, socials on two lines under the game (1342) |
+| CAM | Header down to 478 → 466, with the title centred (220). Cam 0,456 1080 × 608. Footer from 1062 → 1050 with the name strap and stacked socials, centred |
+| CHAT | Cam 220,150 in the band. Chat is a centred column, 277,604 526 × 840: the `Chat` source's own 603:962, and clear of the caption zone. The footer runs along the band, down the column's sides and under it, with the socials on two lines below (1458) |
 | START, BRB, END | The scene's words above the coin (170,236 740 × 400), the socials below it (from 1270), all centred. END's window is 880 × 495 at 100,713; its right end runs under the rail, which a picture may |
 
 **Punch sets, read back off OBS:**
 
 | Scene | Holes |
 | --- | --- |
-| GAME | Cam 220,306 640 × 360 + Game 0,758 1080 × 608 |
+| GAME | Cam 220,264 640 × 360 + Game 0,716 1080 × 608 |
 | CAM | Cam 0,456 1080 × 608 |
-| CHAT | Cam 220,150 640 × 360 + Chat 253,604 574 × 916 |
+| CHAT | Cam 220,150 640 × 360 + Chat 277,604 526 × 840 |
 | START, BRB | None |
 | END | Cam 100,712 880 × 495 |
+
+**A 60/40 GAME was previewed and declined, 2026-11-02.** The user asked to
+see the split many reels use: 40% cam over 60% game, at Cam 1080 × 699 and
+Game 1080 × 1047, with a band of note between them.
+
+- **The cost:** both sources cropped to fill the width, against ADR 0014's
+  16:9 rule. The game showed its middle 58%, and its bottom ~30% sat under
+  TikTok's captions.
+- **The user kept the stacked GAME**, and the preview switch was removed.
+- **Where captions go in edits:** the open question that came up. A 60/40
+  reel puts burned-in captions at the seam, and the band was already there.
+  For the stacked layout the same advice holds: captions under the face, over
+  the cam's bottom, leave the band and the game clear.
 
 - **Silent:** `SOUND` is off, because `OverlayV` must not reroute audio (root
   `CLAUDE.md` §2). The horizontal page's sounds are the stream's.

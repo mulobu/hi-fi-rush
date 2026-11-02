@@ -45,12 +45,25 @@
         return `MTM ${p(d.getDate())}${p(d.getMonth() + 1)}${String(d.getFullYear()).slice(2)}`;
       })();
 
-      /* `cls` places it: each page puts LIVE somewhere different per scene. */
-      const livePill = (cls = "") => `<div class="live ${cls}"><i></i>LIVE</div>`;
-
       /* The socials as a stacked number panel, for an open scene. */
       const socialsStack = (cls) =>
         `<div class="plate socstack ${cls}">${socialsRow("stack")}</div>`;
+
+      /* The socials on two centred lines — the first two handles, then the
+         rest — so they can be set big on a narrow canvas. */
+      const socialsPair = (cls) => {
+        const one = (g) =>
+          `<div class="soc-item">` +
+          g.on
+            .map((n) => `<img src="assets/socials/${n}.svg" alt="${SOCIAL_NAMES[n]}">`)
+            .join("") +
+          `<span class="handle">${serial(g.handle)}</span></div>`;
+        return (
+          `<div class="plate socpair ${cls}">` +
+          `<div class="soc">${SOCIALS.slice(0, 2).map(one).join("")}</div>` +
+          `<div class="soc">${SOCIALS.slice(2).map(one).join("")}</div></div>`
+        );
+      };
 
       const titlePlate = (cls) =>
         `<div class="plate title ${cls}"><b>MONEY TALKS</b><span><em>₹</em>MONDAY</span></div>`;
