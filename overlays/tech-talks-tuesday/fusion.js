@@ -127,9 +127,12 @@ const GridFX=(()=>{
         await enable(false);
       }
     }catch(e){
-      ready=false;hud('3D grid stopped: '+e.message,true);
+      /* One failed request must not cost the rest of the stream its
+         transition: cut this once, then look for the filter again. */
+      ready=false;hud('3D grid stopped: '+e.message,true);warned=true;
       try{await enable(false);}catch(_){}
       settleView(wanted);
+      clearTimeout(retry);retry=setTimeout(attach,5000);
     }finally{running=false;}
   }
   return {attach,go(t,instant){
