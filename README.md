@@ -172,6 +172,19 @@ installed before OBS starts; otherwise `DENOISE` (RNNoise). Without the flag a
 setup run neither adds a noise filter nor removes one. At intensity 1.0 with
 voice detection on it made the voice break up, which is why it is opt-in.
 
+A new collection has no microphone, and no OBS request can pick one. Setup
+copies the mic from the other collection that saved one most recently,
+filters and all (`--mic-from NAME` picks the collection). It does this by
+editing that collection's file while another collection is open, never
+while live. With no collection to copy from, pick one under Settings → Audio
+→ Mic/Auxiliary Audio and re-run.
+
+An overlay whose `overlay.json` has a `transition` (Tech Talks Tuesday's 3D
+grid) gets that shader as a filter on `COMIC`, and on `VCOMIC` with
+`--vertical`. It needs the obs-shaderfilter plugin. After editing the shader,
+`--recompile` makes OBS compile it again; OBS reads the file only when the
+filter is created.
+
 ## 5. Point the sources at your hardware
 
 The script cannot guess these. In OBS, double-click each and pick:

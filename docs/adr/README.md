@@ -20,6 +20,17 @@ is — and why it changed.
 | [0013](0013-money-talks-monday-smash-replaces-the-pan.md) | Money Talks Monday: the smash replaces the pan | 2026-11-02 | Accepted; both pages built, in OBS |
 | [0014](0014-cam-is-the-iphone-camera.md) | `Cam` is the iPhone camera, and cam cutouts are 16:9 | 2026-11-02 | Accepted, built |
 | [0015](0015-chat-source-sized-per-overlay.md) | The `Chat` source is sized per overlay | 2026-11-02 | Accepted, built |
+| [0016](0016-tech-talks-tuesday-glitch-replaces-the-pan.md) | Tech Talks Tuesday: a text-mode screen, and the glitch replaces the pan | 2026-11-02 | Superseded by 0017 |
+| [0017](0017-tech-talks-tuesday-stitch-look-replaces-text-mode.md) | Tech Talks Tuesday: the stitch look replaces text mode | 2026-11-03 | Superseded by 0018 |
+| [0018](0018-tech-talks-tuesday-terminal-garden.md) | Tech Talks Tuesday: the terminal garden, and a CRT for the switch | 2026-11-03 | Accepted, built; horizontal only, in OBS |
+| [0019](0019-tech-talks-tuesday-botanical-palette.md) | Tech Talks Tuesday: restrained botanical palette and clustered flowers | 2026-11-03 | Built; awaiting visual review; revises 0018's art direction |
+| [0020](0020-tech-talks-tuesday-pink-fusion.md) | Tech Talks Tuesday: modern pink framing, ASCII flowers, video grid deformation | 2026-11-03 | Built; pink palette superseded by 0023 |
+| [0021](0021-tech-talks-tuesday-shared-grid-surface.md) | Tech Talks Tuesday: shared shader, travelling fold and retained picture colour | 2026-11-03 | Surface, timing and colour superseded by 0022; shared-body build stands |
+| [0022](0022-tech-talks-tuesday-floor-tilt-grid.md) | Tech Talks Tuesday: the grid waves, tilts back into a floor and cuts on a line | 2026-11-03 | Built; browser and OBS verified with a game running; 0/866 skipped frames |
+| [0023](0023-tech-talks-tuesday-phosphor-palette.md) | Tech Talks Tuesday: phosphor replaces pink | 2026-11-03 | Built; in OBS, chosen by the user from three |
+| [0024](0024-tech-talks-tuesday-vertical-page.md) | Tech Talks Tuesday: the vertical page shares the fusion engine | 2026-11-04 | Built; in OBS on VCOMIC, read back; 0/866 skipped with both canvases; hand-made filters superseded by 0025 |
+| [0025](0025-setup-owns-the-transition-filters.md) | Setup owns an overlay's transition filters | 2026-11-04 | Built; tested against the live collection, `--recompile` included |
+| [0026](0026-setup-copies-a-mic-into-a-new-collection.md) | Setup copies a mic into a collection that has none | 2026-11-04 | Built; tested on `Overlay Template`, then restored |
 
 Decisions taken before 2026-11-01 are in the table in `CLAUDE.md` §3, with
 their reasoning in §2. They are not back-filled here.

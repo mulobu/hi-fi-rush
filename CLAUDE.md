@@ -7,7 +7,10 @@ art and layout lives in `overlays/<name>/CLAUDE.md`. The one live overlay is
 `overlays/hi-fi-rush/`, the comic page. Everything below was built for it,
 which is why its names (`COMIC`, panels, the page) run through it. The second,
 `overlays/money-talks-monday/` (the banknote), has both pages built and in OBS
-as its own collection (2026-11-02), not yet streamed.
+as its own collection (2026-11-02), not yet streamed. The third,
+`overlays/tech-talks-tuesday/` (a garden on an old terminal), has its
+horizontal page built and in OBS as its own collection (2026-11-03), and
+its vertical page on VCOMIC (2026-11-04).
 
 | Where | What |
 | --- | --- |
@@ -1030,9 +1033,20 @@ plugin 1.2.0), straight after `CreateSceneCollection` and again 5 s later:
   `OverlayV` was active with no click in the dock — the renamed scene keeps
   its uuid and so stays the canvas's current one.
 - **It has no inputs at all.** No Desktop Audio, so nothing to disable; and no
-  Mic/Aux either, so a new collection has **no microphone** until one is
-  picked under Settings → Audio → Mic/Auxiliary Audio. Setup says so, and the
-  mic chain and the ducks keyed off it wait for a re-run after.
+  Mic/Aux either, so a new collection has **no microphone**. No request sets
+  a global audio device, so setup copies one in (`do_mic_copy`, ADR 0026):
+  - **The donor** is `--mic-from`, or else the other collection that saved
+    a mic most recently.
+  - **How:** setup switches to the donor, which makes OBS save the target's
+    file and let go of it. It copies `AuxAudioDevice1` (device, settings,
+    filters) into that file with fresh uuids, keeping `<file>.before-mic`,
+    then switches back.
+  - **Then,** in the same run, the mic chain is asserted and the ducks are
+    keyed off it.
+  - **Never while live.** With no donor, setup still says to pick a mic
+    under Settings → Audio → Mic/Auxiliary Audio.
+  - **Done** for Tech Talks Tuesday and Money Talks Monday from Hi-Fi Rush
+    on 2026-11-04, by hand before the function existed.
 - **Its transition is Fade**; setup makes it Cut.
 - **A round trip is clean.** Hi-Fi Rush → the template → Hi-Fi Rush, the
   second leg by `start.py --overlay`: twelve punch sets unchanged, `OverlayV`
@@ -1102,6 +1116,7 @@ it is accepted and not kept, so every run "added" the Discord duck again.
 | Mic device       | Repointed when its saved endpoint is gone | Windows re-ids a device it reinstalls, and OBS then captures nothing without saying so |
 | Ducking          | `DUCK` 3:1 from −38, 50 ms attack, on Game and Browser off the mic; `DUCK DISCORD` on Game | The ratio absorbs the voice swing no compressor now holds; a slow attack lets ~10 ms clicks pass; Discord, alerts and TTS never duck |
 | Mic identity     | Found by input kind, name as tie-break | `Mic/Aux` is localised, and comes off the profile, not COMIC |
+| Mic in a new collection | Copied from the newest other collection's file, or `--mic-from` (ADR 0026) | No request sets a global audio device; the file holds it |
 | Chat feed        | Restream embed socket, token read from `Chat` | The documented API is an OAuth service to run for a read-only feed |
 | TTS engine       | Piper `en_US-lessac-medium`, 1 thread, below normal | OBS's `speechSynthesis` is a stub; uncapped Piper bursts 8 cores |
 | TTS audio        | Its own `Tts` source in COMIC          | Own fader — the deck mutes TTS without muting alerts |
@@ -1111,6 +1126,7 @@ it is accepted and not kept, so every run "added" the Discord duck again.
 | Launching        | `start.py` — bridges, then OBS         | One command; a job object so no bridge orphans |
 | Camera           | iPhone via iOS Camera Source; cam cutouts 16:9 (ADR 0014) | It is the only camera; any other hole shape crops it |
 | Chat source size | Per overlay, `overlay.json` `chat` (ADR 0015) | A browser source cropped to its hole loses text |
+| Shader transition | `overlay.json` `transition`, a filter setup asserts on COMIC and VCOMIC; recreated, never repointed; `--recompile` (ADR 0025) | obs-shaderfilter compiles only when a filter is created |
 
 ### Rejected, and why
 
@@ -1299,9 +1315,22 @@ Real ceiling is encoder sessions — mix NVENC and QuickSync/x264 across outputs
     (§2)
 6q. ⬜ Money Talks Monday, the second show's overlay. Designed 2026-11-02;
     social icons per overlay (ADR 0012), its folder, both pages with
-    `smash.js`, and its OBS collection are done, read back off OBS. A mic, the
-    chat styling, its profile and `shows.json` remain: its own build order,
+    `smash.js`, and its OBS collection are done, read back off OBS; its mic
+    copied from Hi-Fi Rush on 2026-11-04. The chat styling, its profile and
+    `shows.json` remain: its own build order,
     `overlays/money-talks-monday/CLAUDE.md` §4 (ADR 0013)
+6r. ⬜ Tech Talks Tuesday, the third show's overlay. Text mode, then
+    stitches, both rejected; built 2026-11-03 as a terminal garden: real
+    ASCII on an olive (or pink) CRT, text-filled flowers swaying in gusts,
+    header and footer bands on every screen, a CRT turning off for the
+    switch. Then the fusion page, phosphor since 0023, and a 3D grid
+    transition through obs-shaderfilter: the frame waves, tilts back into a
+    floor, and the next scene rises out of a glowing line. In OBS as its own
+    collection, read back off OBS; the vertical page on VCOMIC since
+    2026-11-04, sharing the same engine and transition; its mic copied from
+    Hi-Fi Rush the same day. The chat styling, its profile, `shows.json` and
+    the user's review remain: its own
+    build order, `overlays/tech-talks-tuesday/CLAUDE.md` §4 (ADR 0016-0024)
 7. ⬜ Failsafes + panic key
 8. ⬜ Alert layer + queue, Streamer.bot / EventSub feed
 9. ⬜ Self-host fonts, go live

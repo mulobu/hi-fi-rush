@@ -29,7 +29,10 @@ copied from Hi-Fi Rush before setup ran. Setup then still made `Cam` a
 it makes the iPhone's `ios_camera_source` itself.
 
 **Open in that collection:**
-- **No mic yet:** Settings → Audio → Mic/Auxiliary Audio, then re-run setup.
+- **Mic, 2026-11-04:** copied from Hi-Fi Rush, so it is the same device and
+  the same `NV DENOISE`, `EQ`, `COMPRESS` and `LIMIT` (root CLAUDE.md, "A
+  fresh collection"). Setup then added `DUCK` on `Game` and `Browser`. As
+  copied, `NV DENOISE` is at 1.0 with VAD on.
 - **The passbook `chat.css` does not reach the Restream embed.** It shows
   its own dark default, and its first line runs under the divider. Its
   selectors are the template's YouTube ones; the embed's own DOM has not been
@@ -392,7 +395,7 @@ One step at a time, each checked before the next:
    2026-11-02, then given 16:9 cam cutouts and slimmer bands.
 5. 🟨 OBS:
    - ✅ `--overlay money-talks-monday` built the collection.
-   - ⬜ A mic for it.
+   - ✅ A mic for it, copied from Hi-Fi Rush (2026-11-04).
    - ⬜ The chat styling.
    - ⬜ The profile, which is the user's clicks: Profile → Duplicate, then
      Disconnect Account → Use Stream Key.

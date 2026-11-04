@@ -25,6 +25,11 @@ clicking. See CLAUDE.md §2 for why the shape is what it is.
                                                 vertical canvas
     python3 tools/obs-setup.py --encoder auto   pick the best hardware encoder
                                                 OBS reports on this machine
+    python3 tools/obs-setup.py --mic-from NAME  copy a missing mic from that
+                                                collection, not the newest
+    python3 tools/obs-setup.py --recompile      recreate the overlay's shader
+                                                transition so OBS compiles the
+                                                edited file
 
 Canvas, delay, replay buffer and encoder live in the OBS *profile*, not the
 collection, and every profile is checked, not only the active one: each is
@@ -47,16 +52,19 @@ from __future__ import annotations
 import argparse
 import base64
 import configparser
+import copy
 import csv
 import hashlib
 import json
 import os
+import shutil
 import socket
 import struct
 import subprocess
 import sys
 import time
 import urllib.parse
+import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -1250,6 +1258,15 @@ def main() -> None:
                     help="also assert a mic denoiser pinned first: NV DENOISE "
                          "where OBS can run NVIDIA, else DENOISE (RNNoise). Off "
                          "by default; without it a denoiser is left alone")
+    ap.add_argument("--mic-from", dest="mic_from", default="", metavar="NAME",
+                    help="when this collection has no mic, copy the one in "
+                         "collection NAME. Default: whichever other collection "
+                         "saved a mic most recently")
+    ap.add_argument("--recompile", action="store_true",
+                    help="recreate the overlay's transition filter on every "
+                         "host scene, so obs-shaderfilter compiles the shader "
+                         "file again after an edit. Settings carry over. Never "
+                         "while live")
     ap.add_argument("--vertical", action="store_true",
                     help="also assert %s on the vertical canvas, for streaming "
                          "9:16 alongside. Needs the Aitum Vertical Canvas "
@@ -1332,6 +1349,11 @@ def main() -> None:
 
     plan = Plan(a.check)
     layout = stack(a.placeholders)
+
+    # --- a mic, if the collection has none ---------------------------------
+    # First, because it reloads the collection: everything below must read
+    # the collection as it is after.
+    mic_copy = do_mic_copy(obs, plan, a, want_coll)
 
     preflight(plan)
 
@@ -1541,7 +1563,9 @@ def main() -> None:
     # --- mic chain ---------------------------------------------------------
     # Independent of COMIC: the mic is a global audio device off the profile,
     # not a source this script creates. Found once, shared with the ducks.
-    mic = find_mic(obs, plan)
+    # Under --check a planned copy has not happened, so there is no mic yet
+    # to look for, and "pick one in Settings" would be the wrong advice.
+    mic = None if (a.check and mic_copy) else find_mic(obs, plan)
     do_mic_device(obs, plan, mic)
     if a.denoise:
         do_mic_denoise(obs, plan, mic)
@@ -1560,6 +1584,11 @@ def main() -> None:
     # relative to it.
     if a.grade:
         do_grade_filter(obs, plan)
+
+    # --- the overlay's own transition --------------------------------------
+    # After COMIC exists. Only for an overlay whose overlay.json names one;
+    # VCOMIC's is asserted inside do_vertical.
+    do_transition_filter(obs, plan, a, {"sourceName": HOST_SCENE}, HOST_SCENE, {})
 
     # --- clipping ----------------------------------------------------------
     # The vertical plugin's half. The profile's half runs per profile, below.
@@ -2135,7 +2164,8 @@ def find_mic(obs, plan: Plan):
 
     Not hardcoded to a name. `Mic/Aux` is OBS's own label for the first global
     audio device, it is localised, and this script never creates it -- it comes
-    off the profile, not out of COMIC. So the mic is found by input *kind*, and
+    off the profile, not out of COMIC, or is copied in from another
+    collection by do_mic_copy. So the mic is found by input *kind*, and
     the name is only a tie-break for a machine with more than one capture
     device wired up. Two of them and no `Mic/Aux` is not guessable, so it says
     so rather than filtering the wrong one.
@@ -2158,6 +2188,96 @@ def find_mic(obs, plan: Plan):
               % (len(ins), MIC_SOURCE,
                  ", ".join(i["inputName"] for i in ins)))
     return None
+
+
+# --- a mic for a collection that has none -------------------------------------
+# A new collection starts with no global audio device at all, and no request
+# sets one: GetSpecialInputs reads them, nothing writes them. But the
+# collection's file holds the mic, as AuxAudioDevice1 -- device, settings,
+# filters, fader -- so a mic that works in another collection is copied across
+# in the file (docs/adr/0026). OBS holds the active collection's file and
+# rewrites it on the way out, so the target is released first by switching to
+# the donor, which saves it, and loaded again after.
+MIC_SLOTS = ["AuxAudioDevice%d" % n for n in range(1, 5)]
+
+
+def collection_mic(path: Path):
+    """The first global mic saved in a collection file, or None."""
+    try:
+        doc = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    mic = next((doc[k] for k in MIC_SLOTS if doc.get(k)), None)
+    return mic if mic and mic.get("id") in MIC_KINDS else None
+
+
+def do_mic_copy(obs, plan: Plan, a, target: str) -> bool:
+    """Copy a working mic into the active collection when it has none.
+
+    The donor is --mic-from, or else the other collection that saved a mic
+    most recently. The copy keeps the donor's device, settings and filters,
+    with fresh uuids; do_mic_device then repoints a device this machine no
+    longer offers, and do_duck keys the ducks off it. The target's file is
+    kept beside it as <file>.before-mic. Switching collections reloads every
+    source, so never while live. Returns whether a copy was made -- or, under
+    --check, would be.
+    """
+    if any(i["inputKind"] in MIC_KINDS
+           for i in obs.req("GetInputList")["inputs"]):
+        return False
+    donors = {}
+    for name in obs.req("GetSceneCollectionList")["sceneCollections"]:
+        if name == target:
+            continue
+        try:
+            path = collection_path(name)
+        except SystemExit:
+            continue
+        mic = collection_mic(path)
+        if mic:
+            donors[name] = (path.stat().st_mtime, mic)
+    if a.mic_from and a.mic_from not in donors:
+        plan.warn("--mic-from %r: no other collection by that name has a mic "
+                  "-- these do: %s" % (a.mic_from, ", ".join(sorted(donors)) or "none"))
+        return False
+    if not donors:
+        return False                 # find_mic says what to pick, and where
+    donor = a.mic_from or max(donors, key=lambda n: donors[n][0])
+    live = outputs_live(obs)
+    if live:
+        plan.warn("this collection has no mic. Copying %s's in reloads every "
+                  "source, so it waits until %s stops"
+                  % (donor, " and ".join(live)))
+        return False
+    mic = donors[donor][1]
+
+    def apply() -> None:
+        dest = collection_path(target)
+        obs.req("SetCurrentSceneCollection", {"sceneCollectionName": donor})
+        try:
+            doc = json.loads(dest.read_text(encoding="utf-8"))
+            if any(doc.get(k) for k in MIC_SLOTS):
+                return               # it gained one meanwhile; leave it be
+            m = copy.deepcopy(mic)
+            m["uuid"] = str(uuid.uuid4())
+            for f in m.get("filters") or []:
+                f["uuid"] = str(uuid.uuid4())
+            doc["AuxAudioDevice1"] = m
+            shutil.copy2(dest, dest.with_name(dest.name + ".before-mic"))
+            tmp = dest.with_name(dest.name + ".tmp")
+            tmp.write_text(json.dumps(doc, indent=4, ensure_ascii=False),
+                           encoding="utf-8")
+            os.replace(tmp, dest)
+        finally:
+            obs.req("SetCurrentSceneCollection", {"sceneCollectionName": target})
+
+    plan.do(
+        "copy %s from %s, with %s -- this collection has no mic and no "
+        "request sets one; reloads the collection"
+        % (mic.get("name") or "the mic", donor,
+           ", ".join(f["name"] for f in mic.get("filters") or []) or "no filters"),
+        apply)
+    return True
 
 
 def do_mic_device(obs, plan: Plan, mic) -> None:
@@ -2608,6 +2728,111 @@ def do_grade_filter(obs, plan: Plan) -> None:
         )
 
 
+# --- the overlay's transition filter ----------------------------------------
+# An overlay may run its scene change as a shader on the host scene, named in
+# overlay.json's "transition": Tech Talks Tuesday's 3D grid (docs/adr/0022,
+# 0025). It is an obs-shaderfilter `shader_filter`, one on COMIC and one on
+# VCOMIC, and the page switches it on and off around each change; with no
+# filter the page cuts. The page names the filter too (fusion.js), so the two
+# must agree.
+TRANSITION_KIND = "shader_filter"
+
+
+def transition_cfg() -> dict:
+    return OVERLAY_CFG.get("transition") or {}
+
+
+def do_transition_filter(obs, plan: Plan, a, where: dict, label: str,
+                         extra: dict) -> None:
+    """Assert the overlay's transition filter on one host scene, at the top.
+
+    `where` addresses the scene: {"sourceName": "COMIC"}, or VCOMIC's
+    {"sourceUuid": ...}. `extra` is that canvas's own settings at creation.
+
+    obs-shaderfilter reads and compiles the shader file only when a filter is
+    created -- setting shader_file_name again recompiles nothing, and its
+    Reload button is out of the websocket's reach. So a filter pointing at the
+    wrong file (an imported collection, a moved repo) is recreated rather than
+    repointed, and --recompile recreates it after an edit. What it held carries
+    over; only the path is this script's. The rest -- columns, relief, wave --
+    is taste, written at creation only. Enabled state is the page's: created
+    off and never switched here.
+    """
+    cfg = transition_cfg()
+    if not cfg:
+        return
+    name = cfg["filter"]
+    shader = OVERLAY_DIR / cfg["shader"]
+    if not shader.is_file():
+        plan.warn("%s is missing, so %s gets no %s filter and the page cuts"
+                  % (shader.relative_to(REPO).as_posix(), label, name))
+        return
+    kinds = obs.req("GetSourceFilterKindList")["sourceFilterKinds"]
+    if TRANSITION_KIND not in kinds:
+        plan.warn(
+            "OBS has no %s filter, so %s gets no %s and the page cuts. Install "
+            "obs-shaderfilter under %%ProgramData%%\\obs-studio\\plugins and "
+            "restart OBS -- plugins load at launch" % (TRANSITION_KIND, label, name))
+        return
+    try:
+        filters = obs.req("GetSourceFilterList", where)["filters"]
+    except ObsError:
+        return                       # the scene is only scheduled for creation
+    have = next((f for f in filters if f["filterName"] == name), None)
+    if have is not None and have["filterKind"] != TRANSITION_KIND:
+        plan.warn(
+            "%s on %s is a %s, not a %s -- rename or remove it, this script "
+            "will not overwrite a filter it did not make"
+            % (name, label, have["filterKind"], TRANSITION_KIND))
+        return
+    target = {**where, "filterName": name}
+    want = {"from_file": True, "shader_file_name": str(shader)}
+
+    def create(settings: dict) -> None:
+        # CreateSourceFilter makes every filter enabled. At Progress 0 the
+        # shader passes the picture through untouched, so the moment before
+        # it is switched off shows nothing, even live; then automatic.
+        obs.req("CreateSourceFilter", {**target, "filterKind": TRANSITION_KIND,
+                                       "filterSettings": {**settings, "Progress": 0}})
+        obs.req("SetSourceFilterEnabled", {**target, "filterEnabled": False})
+        obs.req("SetSourceFilterSettings",
+                {**target, "filterSettings": {"Progress": -1}})
+        obs.req("SetSourceFilterIndex", {**target, "filterIndex": 0})
+
+    if have is None:
+        plan.do("add %s filter to %s (%s), off" % (name, label, shader.name),
+                lambda: create({**(cfg.get("settings") or {}), **extra, **want}))
+        return
+
+    held = have.get("filterSettings") or {}
+    path = held.get("shader_file_name") or ""
+    why = ""
+    if not path or (os.path.normcase(os.path.abspath(path))
+                    != os.path.normcase(str(shader))):
+        why = "it points at %s" % (path or "nothing")
+    elif a.recompile:
+        why = "--recompile"
+    if why:
+        if outputs_live(obs):
+            plan.warn("%s on %s needs recreating (%s), which waits until "
+                      "nothing is live" % (name, label, why))
+        else:
+            keep = {k: v for k, v in held.items() if k != "last_error"}
+            plan.do(
+                "recreate %s on %s -- %s, and obs-shaderfilter compiles a "
+                "shader only when its filter is created" % (name, label, why),
+                lambda: (obs.req("RemoveSourceFilter", target),
+                         create({**keep, **want})))
+        return
+    if held.get("last_error"):
+        plan.warn("%s on %s did not compile: %s -- fix %s, then re-run with "
+                  "--recompile" % (name, label, held["last_error"], shader.name))
+    if have["filterIndex"] != 0:
+        plan.do("move %s to the top of %s's filters" % (name, label),
+                lambda: obs.req("SetSourceFilterIndex",
+                                {**target, "filterIndex": 0}))
+
+
 def vertical_canvas(obs):
     """The canvas that is not Main, by uuid. Never matched by name -- OBS
     accepts canvasName and then ignores it.
@@ -2807,6 +3032,11 @@ def do_vertical(obs, plan: Plan, a, pw: str) -> None:
                     for i, n in enumerate(want_order)
                 ],
             )
+
+    # The overlay's transition, by uuid like everything else here: VCOMIC
+    # is "not found within the canvas Main" by name, filters included.
+    do_transition_filter(obs, plan, a, {"sourceUuid": su}, VERT_SCENE,
+                         transition_cfg().get("vertical") or {})
 
     vertical_output_check(plan)
 
