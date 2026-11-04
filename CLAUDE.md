@@ -10,14 +10,17 @@ which is why its names (`COMIC`, panels, the page) run through it. The second,
 as its own collection (2026-11-02), not yet streamed. The third,
 `overlays/tech-talks-tuesday/` (a garden on an old terminal), has its
 horizontal page built and in OBS as its own collection (2026-11-03), and
-its vertical page on VCOMIC (2026-11-04).
+its vertical page on VCOMIC (2026-11-04). The fourth,
+`overlays/fitness-friday/` (anatomy blueprints on a royal blue sheet), has
+both pages built and in OBS as its own collection (2026-11-05), not yet
+streamed; its live heart rate waits on a watch app still to be written.
 
 | Where | What |
 | --- | --- |
 | `overlays/<name>/` | One overlay: `overlay.json`, `overlay.html`, `vertical.html`, `chat.css`, `mascot/placement*.json`, `obs/scenes.json`, `assets/` (its own art, socials icons included), its own `CLAUDE.md`. `overlays/_template/` is where a new one starts |
 | `core/` | The page code every overlay shares, and `contract.js`, the names they all use. `core/README.md` is the page contract |
 | `tools/obs-setup.py` | Builds and checks the OBS side; the deck runs it for CLIP and GO LIVE |
-| `start.py`, `chat/`, `mascot/` | Bridges, chat TTS, the mascot page and its sprite sets (`mascot/sets/`) |
+| `start.py`, `chat/`, `mascot/`, `heart/` | Bridges, chat TTS, the mascot page and its sprite sets (`mascot/sets/`), the live heart rate (ADR 0028) |
 | `assets/` | The workshop: LUTs and scratch, all gitignored. Nothing an overlay loads lives here |
 | `docs/adr/` | **Decision records.** Every decision from 2026-11-01 on, one dated file each |
 
@@ -832,6 +835,17 @@ mid-stream, `start.py` names it and starts the mascot anyway, and
 `obs-setup.py --check` warns. A filter that silently turns off when its list
 goes missing is worse than no filter, because it looks like one.
 
+**Live heart rate: a third bridge, for overlays that ask** (ADR 0028).
+`heart/heart-bridge.py`, port 4462, takes `POST /hr {"bpm": 72}` from our
+own Apple Watch app (not written yet; it is to be built on a Mac) and serves
+`/events` to the pages, as the chat bridge does for `tts.html`. watchOS
+allows plain HTTP but not WebSockets (Apple TN3135), so the watch posts. It
+binds every interface, because the watch is another device, so its first
+run asks for a firewall exception (Private). `start.py` runs it only for an
+overlay whose `overlay.json` says `"heart": true`. Pages show the number
+only while a reading is under 15 s old: before the first reading they show
+the design's value, and after a lost feed `--`.
+
 **`start.py` is the one command.** Both bridges, then OBS if it is not open.
 Each bridge's output is prefixed with its name; one that crashes after running
 a while is restarted with backoff, and one that dies in its first 8 s is left
@@ -1047,6 +1061,10 @@ plugin 1.2.0), straight after `CreateSceneCollection` and again 5 s later:
     under Settings → Audio → Mic/Auxiliary Audio.
   - **Done** for Tech Talks Tuesday and Money Talks Monday from Hi-Fi Rush
     on 2026-11-04, by hand before the function existed.
+- **It has blank hardware sources.** `Game`, `Cam`, `Browser` and `Chat`'s
+  url are copied when unset, from the newest other collection that has them
+  set up, over the websocket, with no reload (`do_source_copy`, ADR 0029).
+  A source already set up is never touched.
 - **Its transition is Fade**; setup makes it Cut.
 - **A round trip is clean.** Hi-Fi Rush → the template → Hi-Fi Rush, the
   second leg by `start.py --overlay`: twelve punch sets unchanged, `OverlayV`
@@ -1117,6 +1135,7 @@ it is accepted and not kept, so every run "added" the Discord duck again.
 | Ducking          | `DUCK` 3:1 from −38, 50 ms attack, on Game and Browser off the mic; `DUCK DISCORD` on Game | The ratio absorbs the voice swing no compressor now holds; a slow attack lets ~10 ms clicks pass; Discord, alerts and TTS never duck |
 | Mic identity     | Found by input kind, name as tie-break | `Mic/Aux` is localised, and comes off the profile, not COMIC |
 | Mic in a new collection | Copied from the newest other collection's file, or `--mic-from` (ADR 0026) | No request sets a global audio device; the file holds it |
+| Hardware sources in a new collection | Game, Cam, Browser and Chat's url copied when unset, from the newest collection that has them set, or `--sources-from` (ADR 0029) | Every new collection needed the same clicks; a set-up source is never touched |
 | Chat feed        | Restream embed socket, token read from `Chat` | The documented API is an OAuth service to run for a read-only feed |
 | TTS engine       | Piper `en_US-lessac-medium`, 1 thread, below normal | OBS's `speechSynthesis` is a stub; uncapped Piper bursts 8 cores |
 | TTS audio        | Its own `Tts` source in COMIC          | Own fader — the deck mutes TTS without muting alerts |
@@ -1124,6 +1143,7 @@ it is accepted and not kept, so every run "added" the Discord duck again.
 | TTS monitoring   | Monitor and Output                     | Measured: OBS 32 dedups it out of Desktop Audio |
 | TTS blocklist    | Gitignored, required to start          | Personal and a list of slurs; a missing filter must be loud |
 | Launching        | `start.py` — bridges, then OBS         | One command; a job object so no bridge orphans |
+| Heart rate       | Our own Apple Watch app → HTTP POST → `heart/heart-bridge.py` → SSE to the pages (ADR 0028) | No service or token; watchOS allows HTTP, not WebSockets; the page draws its own heart |
 | Camera           | iPhone via iOS Camera Source; cam cutouts 16:9 (ADR 0014) | It is the only camera; any other hole shape crops it |
 | Chat source size | Per overlay, `overlay.json` `chat` (ADR 0015) | A browser source cropped to its hole loses text |
 | Shader transition | `overlay.json` `transition`, a filter setup asserts on COMIC and VCOMIC; recreated, never repointed; `--recompile` (ADR 0025) | obs-shaderfilter compiles only when a filter is created |
@@ -1331,6 +1351,15 @@ Real ceiling is encoder sessions — mix NVENC and QuickSync/x264 across outputs
     Hi-Fi Rush the same day. The chat styling, its profile, `shows.json` and
     the user's review remain: its own
     build order, `overlays/tech-talks-tuesday/CLAUDE.md` §4 (ADR 0016-0024)
+6s. ⬜ Fitness Friday, the fourth show's overlay. A royal blue drafting
+    sheet with HUGE Anton type and yellow anatomy plates drawn in code
+    (body, brain, heart, lungs, hand), and a word sting in place of the
+    pan. Both pages built; in OBS as its own collection 2026-11-05, all
+    twelve punch sets read back, 0 of 758 frames skipped, its mic copied
+    from Money Talks Monday. The live heart rate's PC side is built
+    (`heart/`, ADR 0028); the Apple Watch app is next, on the MacBook.
+    The chat styling, its profile and `shows.json` remain: its own build
+    order, `overlays/fitness-friday/CLAUDE.md` §4 (ADR 0027, 0028)
 7. ⬜ Failsafes + panic key
 8. ⬜ Alert layer + queue, Streamer.bot / EventSub feed
 9. ⬜ Self-host fonts, go live

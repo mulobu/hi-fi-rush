@@ -27,6 +27,10 @@ clicking. See CLAUDE.md §2 for why the shape is what it is.
                                                 OBS reports on this machine
     python3 tools/obs-setup.py --mic-from NAME  copy a missing mic from that
                                                 collection, not the newest
+    python3 tools/obs-setup.py --sources-from NAME
+                                                copy unset Game / Cam / Browser
+                                                / Chat url from that collection,
+                                                not the newest
     python3 tools/obs-setup.py --recompile      recreate the overlay's shader
                                                 transition so OBS compiles the
                                                 edited file
@@ -839,7 +843,7 @@ def discover_password() -> str:
     """
     cfg = obs_config_dir() / "plugin_config/obs-websocket/config.json"
     try:
-        return json.loads(cfg.read_text()).get("server_password", "")
+        return json.loads(cfg.read_text(encoding="utf-8")).get("server_password", "")
     except Exception:
         return ""
 
@@ -871,7 +875,7 @@ def collection_path(name: str = "") -> Path:
         raise SystemExit("error: no scene collection found in %s" % d)
     def display(f: Path) -> str:
         try:
-            return json.loads(f.read_text()).get("name") or f.stem
+            return json.loads(f.read_text(encoding="utf-8")).get("name") or f.stem
         except Exception:
             return f.stem
 
@@ -931,9 +935,13 @@ def scrub(node):
     if isinstance(node, str):
         # Catches anything the structured rules missed -- module settings,
         # recording paths, script paths. Your username is not repo content.
-        home = str(Path.home())
+        # Both spellings of a Windows path: a Qt file dialog saves C:/...,
+        # this script saves C:\... The repo first, since it is under home.
+        home = Path.home()
         for raw, token in ((REPO.as_uri(), REPO_TOKEN), (str(REPO), REPO_TOKEN),
-                           (Path.home().as_uri(), HOME_TOKEN), (home, HOME_TOKEN)):
+                           (REPO.as_posix(), REPO_TOKEN),
+                           (home.as_uri(), HOME_TOKEN), (str(home), HOME_TOKEN),
+                           (home.as_posix(), HOME_TOKEN)):
             node = node.replace(raw, token)
             node = node.replace(urllib.parse.quote(raw), token)
         return node
@@ -996,7 +1004,7 @@ def do_export(a) -> None:
     src = Path(a.export_from) if a.export_from else collection_path(collection)
     out = Path(a.out) if a.out else OVERLAY_DIR / "obs" / "scenes.json"
 
-    raw = json.loads(src.read_text())
+    raw = json.loads(src.read_text(encoding="utf-8"))
     age = time.time() - src.stat().st_mtime
 
     # OBS keeps the collection in memory and writes it out on its own schedule,
@@ -1042,7 +1050,10 @@ def do_export(a) -> None:
     blob = json.dumps(clean)
     leaks = [p for p in SECRET_PARAMS if ("%s=" % p) in blob and
              not blob.count("%s=&" % p) and not blob.count('%s="' % p)]
-    if str(Path.home()) in blob:
+    # As json.dumps writes it -- C:\\Users\\... -- in either spelling and any
+    # case, since Windows paths ignore it: the raw str(home) never appears.
+    if any(json.dumps(h)[1:-1].lower() in blob.lower()
+           for h in (str(Path.home()), Path.home().as_posix())):
         leaks.append("home path")
     if leaks:
         raise SystemExit(
@@ -1059,7 +1070,8 @@ def do_export(a) -> None:
     )
 
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps(clean, indent=2, ensure_ascii=False) + "\n")
+    out.write_text(json.dumps(clean, indent=2, ensure_ascii=False) + "\n",
+                   encoding="utf-8")
 
     print("exported %s" % out)
     print("  from      %s" % src)
@@ -1262,6 +1274,11 @@ def main() -> None:
                     help="when this collection has no mic, copy the one in "
                          "collection NAME. Default: whichever other collection "
                          "saved a mic most recently")
+    ap.add_argument("--sources-from", dest="sources_from", default="", metavar="NAME",
+                    help="when Game, Cam, Browser or Chat's url has nothing "
+                         "chosen, copy it from collection NAME. Default: per "
+                         "source, whichever other collection saved it set up "
+                         "most recently. A source already set up is never touched")
     ap.add_argument("--recompile", action="store_true",
                     help="recreate the overlay's transition filter on every "
                          "host scene, so obs-shaderfilter compiles the shader "
@@ -1390,6 +1407,7 @@ def main() -> None:
         report(plan, a)
         return
 
+    made = {}                        # name -> kind, created this run
     for name, kind, colour in layout:
         if name in inputs:
             if inputs[name] != kind:
@@ -1414,6 +1432,7 @@ def main() -> None:
         if kind == "color_source_v3":
             settings = {"color": colour or 0xFF404040,
                         "width": CANVAS_W, "height": CANVAS_H}
+        made[name] = kind
         if name == BROWSER_SOURCE:
             plan.do(
                 "create input %s (%s), muted and parked -- off air until "
@@ -1453,6 +1472,11 @@ def main() -> None:
                 lambda n=name, d=diff: obs.req(
                     "SetInputSettings", {"inputName": n, "inputSettings": d}),
             )
+
+    # --- hardware sources, copied from another collection -------------------
+    # After the browser settings, which give Chat its size; the copy gives it
+    # only its url (docs/adr/0029).
+    do_source_copy(obs, plan, a, want_coll, inputs, made)
 
     if a.check and any(x.startswith("create input") for x in plan.actions):
         # Nothing below can be checked meaningfully against sources that do not
@@ -1528,13 +1552,16 @@ def main() -> None:
             continue                       # only just scheduled for creation
         host = next((i for i in tit if i["sourceName"] == HOST_SCENE), None)
         if host is None:
-            plan.do(
-                "add %s to %s" % (HOST_SCENE, name),
-                lambda n=name: obs.req(
-                    "CreateSceneItem",
-                    {"sceneName": n, "sourceName": HOST_SCENE,
-                     "sceneItemEnabled": True}),
-            )
+            # Squared up as it is added: otherwise a fresh build left every
+            # trigger scene for a second run to square (2026-11-05).
+            def add(n=name):
+                i = obs.req("CreateSceneItem",
+                            {"sceneName": n, "sourceName": HOST_SCENE,
+                             "sceneItemEnabled": True})["sceneItemId"]
+                obs.req("SetSceneItemTransform",
+                        {"sceneName": n, "sceneItemId": i,
+                         "sceneItemTransform": want_tf})
+            plan.do("add %s to %s" % (HOST_SCENE, name), add)
             continue
         tf = host["sceneItemTransform"]
         if any(abs(float(tf.get(k, 0)) - float(vv)) > 0.5
@@ -2278,6 +2305,113 @@ def do_mic_copy(obs, plan: Plan, a, target: str) -> bool:
            ", ".join(f["name"] for f in mic.get("filters") or []) or "no filters"),
         apply)
     return True
+
+
+# The hardware sources, copied into a collection that has them unset
+# (docs/adr/0029). Setup creates Game, Cam, Browser and Chat but cannot know
+# which window, which phone or which chat widget -- and every collection
+# needed the same choices made again by hand, or showed black windows and an
+# empty chat with no error anywhere. Unlike the mic these are ordinary
+# inputs, so the copy is a SetInputSettings over the websocket, read from the
+# donor collection's saved file. No collection switch, so nothing reloads.
+#
+# A source is "unset" when its settings hold nothing beyond what setup itself
+# writes: SETUP_WRITES lists those keys, with the value setup writes, or None
+# for a key setup owns whatever its value (Capture Audio is do_audio's). The
+# copy never carries a key setup owns, and Chat only ever takes its url --
+# its size and css are derived from the overlay.
+SOURCE_COPY = [SRC["game"], SRC["cam"], SRC["browser"], SRC["chat"]]
+SETUP_WRITES = {
+    SRC["game"]: {"capture_audio": None},
+    SRC["cam"]: {},
+    SRC["browser"]: {**BROWSER_SETTINGS, "capture_audio": None},
+}
+BLANK_URLS = ("", "about:blank")
+# Setup's own default is a working choice for these -- Browser's is any Chrome
+# window -- so a donor with something else is copied in, and with nothing
+# better there is nothing to warn about.
+DEFAULT_WORKS = {SRC["browser"]}
+
+
+def source_unset(name: str, settings: dict) -> bool:
+    if name == SRC["chat"]:
+        return settings.get("url", "") in BLANK_URLS
+    own = SETUP_WRITES.get(name, {})
+    return all(k in own and (own[k] is None or own[k] == v) for k, v in settings.items())
+
+
+def copy_part(name: str, settings: dict) -> dict:
+    """What of a donor's settings is copied: never a key setup owns."""
+    if name == SRC["chat"]:
+        return {"url": settings["url"]}
+    own = {k for k, v in SETUP_WRITES.get(name, {}).items() if v is None}
+    return {k: v for k, v in settings.items() if k not in own}
+
+
+def collection_sources(path: Path) -> dict:
+    """{input name: (kind, settings)} from a saved collection file."""
+    try:
+        doc = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return {s["name"]: (s.get("versioned_id") or s.get("id"), s.get("settings") or {})
+            for s in doc.get("sources") or [] if s.get("name")}
+
+
+def do_source_copy(obs, plan: Plan, a, target: str, inputs: dict, made: dict) -> None:
+    """Copy Game, Cam, Browser and Chat's url in from another collection
+    when they are unset here. `inputs` is what existed when the run began and
+    `made` what it creates (both name -> kind); under --check the made ones
+    do not exist yet and are taken as new, so unset.
+
+    The donor, per source, is --sources-from, or else the other collection
+    that saved that source set up, of the same kind, most recently. A source
+    already set up is never touched, so a deliberate choice survives every
+    run, and a colour placeholder is left alone. The Chat url carries the
+    chat embed's token: it is copied, never printed."""
+    kinds = {**inputs, **made}
+    names = [n for n in SOURCE_COPY
+             if n in kinds and not kinds[n].startswith("color_source")]
+    if not names:
+        return
+    donors = {}
+    for coll in obs.req("GetSceneCollectionList")["sceneCollections"]:
+        if coll == target:
+            continue
+        try:
+            path = collection_path(coll)
+        except SystemExit:
+            continue
+        donors[coll] = (path.stat().st_mtime, collection_sources(path))
+    if a.sources_from and a.sources_from not in donors:
+        plan.warn("--sources-from %r: no saved collection by that name -- have: %s"
+                  % (a.sources_from, ", ".join(sorted(donors)) or "none"))
+        return
+    for name in names:
+        kind = kinds[name]
+        have = {} if name in made else             obs.req("GetInputSettings", {"inputName": name})["inputSettings"]
+        if not source_unset(name, have):
+            continue
+        ok = {c: src[name][1] for c, (_, src) in donors.items()
+              if name in src and src[name][0] == kind
+              and not source_unset(name, src[name][1])}
+        pick = a.sources_from or (max(ok, key=lambda c: donors[c][0]) if ok else "")
+        if pick not in ok:
+            if name in DEFAULT_WORKS:
+                continue
+            where = ("%s has none set up" % pick if a.sources_from else
+                     "no other collection has one set up to copy")
+            plan.warn("%s has nothing chosen, and %s -- pick %s in OBS (README, "
+                      "step 5). Collections built after this one copy it from here"
+                      % (name, where, "the chat widget url" if name == SRC["chat"]
+                         else "what it captures"))
+            continue
+        part = copy_part(name, ok[pick])
+        shown = "its url" if name == SRC["chat"] else ", ".join(sorted(part))
+        plan.do("%s: copy %s from %s -- it had nothing chosen" % (name, shown, pick),
+                lambda n=name, p=part: obs.req(
+                    "SetInputSettings", {"inputName": n, "inputSettings": p,
+                                         "overlay": True}))
 
 
 def do_mic_device(obs, plan: Plan, mic) -> None:
@@ -3318,7 +3452,7 @@ def preflight(plan: Plan) -> None:
         return
     sets = "mascot/sets/%s" % OVERLAY_CFG["mascot"]["set"]
     try:
-        man = json.loads((REPO / sets / "manifest.json").read_text())
+        man = json.loads((REPO / sets / "manifest.json").read_text(encoding="utf-8"))
         sheet = REPO / sets / man.get("sheet", "")
         if not sheet.exists():
             plan.warn(

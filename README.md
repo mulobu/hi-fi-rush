@@ -172,6 +172,15 @@ installed before OBS starts; otherwise `DENOISE` (RNNoise). Without the flag a
 setup run neither adds a noise filter nor removes one. At intensity 1.0 with
 voice detection on it made the voice break up, which is why it is opt-in.
 
+**Game, Cam, Browser and Chat are copied too.** When one of them has nothing
+chosen -- a new collection's always do -- setup copies it from the other
+collection that saved it set up most recently: Game's window, the camera,
+Chat's widget url (copied, never printed). A source you have already set up
+is never touched. `--sources-from NAME` picks the collection
+([ADR 0029](docs/adr/0029-setup-copies-the-hardware-sources.md)). So on a new
+machine, set them once in the first collection and every one after copies
+them.
+
 A new collection has no microphone, and no OBS request can pick one. Setup
 copies the mic from the other collection that saved one most recently,
 filters and all (`--mic-from NAME` picks the collection). It does this by
@@ -187,7 +196,9 @@ filter is created.
 
 ## 5. Point the sources at your hardware
 
-The script cannot guess these. In OBS, double-click each and pick:
+The script cannot guess these, so do it once, in the first collection you
+build. Every collection built after copies them (step 4). In OBS, double-click
+each and pick:
 
 | Source | Set |
 | --- | --- |

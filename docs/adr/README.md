@@ -31,6 +31,9 @@ is — and why it changed.
 | [0024](0024-tech-talks-tuesday-vertical-page.md) | Tech Talks Tuesday: the vertical page shares the fusion engine | 2026-11-04 | Built; in OBS on VCOMIC, read back; 0/866 skipped with both canvases; hand-made filters superseded by 0025 |
 | [0025](0025-setup-owns-the-transition-filters.md) | Setup owns an overlay's transition filters | 2026-11-04 | Built; tested against the live collection, `--recompile` included |
 | [0026](0026-setup-copies-a-mic-into-a-new-collection.md) | Setup copies a mic into a collection that has none | 2026-11-04 | Built; tested on `Overlay Template`, then restored |
+| [0027](0027-fitness-friday-blueprint-sheet-and-word-sting.md) | Fitness Friday: a blueprint sheet, and the word sting replaces the pan | 2026-11-04 | Built; both pages in OBS 2026-11-05, punch sets read back |
+| [0028](0028-heart-rate-from-our-own-watch-app.md) | Heart rate comes from our own Apple Watch app, over HTTP to a bridge | 2026-11-04 | Accepted; PC side built and tested with `--fake`, in OBS; the watch app is not built |
+| [0029](0029-setup-copies-the-hardware-sources.md) | Setup copies Game, Cam, Browser and Chat's url into a collection that has them unset | 2026-11-05 | Built; tested on `Fitness Friday` by blanking and restoring |
 
 Decisions taken before 2026-11-01 are in the table in `CLAUDE.md` §3, with
 their reasoning in §2. They are not back-filled here.
