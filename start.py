@@ -9,22 +9,25 @@ start -- everything that has to be running while you stream, in one command.
     python3 start.py --overlay hi-fi-rush --profile vALO
                                      ...and on that Restream setup
     python3 start.py --display 1     mascot follows the cursor on display 1
-    python3 start.py --only chat     just one bridge: mascot or chat
+    python3 start.py --only chat     just one bridge: mascot, chat or heart
     python3 start.py --no-obs        do not launch OBS
 
 Starts, in this order:
 
     mascot  mascot/bridge/cursor-bridge.py   127.0.0.1:4460   Mascot, MascotV
     chat    chat/chat-bridge.py              127.0.0.1:4461   Tts
-    OBS     only if it is not already running, once both bridges listen
+    heart   heart/heart-bridge.py            0.0.0.0:4462     the watch app, and
+                                                              pages with a live BPM
+    OBS     only if it is not already running, once the bridges listen
 
 With --overlay, OBS launches straight into the overlay's scene collection
 (overlays/<name>/overlay.json), and an OBS that is already running is
 switched to it over the websocket -- never while anything is live, since a
 collection switch reloads every source. --profile does the same for the
 profile, which picks the Restream setup and so the game. An overlay with no
-mascot gets no mascot bridge. Without --overlay, OBS opens on whatever it
-had last, as before.
+mascot gets no mascot bridge, and only an overlay with "heart": true gets the
+heart bridge (docs/adr/0028). Without --overlay, OBS opens on whatever it had
+last, as before.
 
 Bridges first, so each browser source finds its page on the first try rather
 than on a retry. Every line a bridge prints comes out here prefixed with its
@@ -77,6 +80,7 @@ def load_contract() -> dict:
 PORTS = load_contract()["ports"]
 MASCOT_PORT = PORTS["mascot"]
 TTS_PORT = PORTS["chat"]              # chat-bridge.py's default must match
+HEART_PORT = PORTS["heart"]           # heart-bridge.py reads the same contract
 OBS_WS_PORT = PORTS["obs"]
 
 CHAT = REPO / "chat"
@@ -387,7 +391,7 @@ def main() -> None:
     ap.add_argument("--display", type=int, default=0,
                     help="mascot: which display the cursor is read from "
                          "(see mascot/bridge/cursor-bridge.py --list-displays)")
-    ap.add_argument("--only", choices=["mascot", "chat"],
+    ap.add_argument("--only", choices=["mascot", "chat", "heart"],
                     help="start just one bridge")
     ap.add_argument("--no-obs", action="store_true",
                     help="do not launch OBS if it is not running")
@@ -397,7 +401,7 @@ def main() -> None:
                     help="today's OBS profile, i.e. Restream setup")
     a = ap.parse_args()
 
-    collection, mascot = "", True
+    collection, mascot, heart = "", True, False
     if a.overlay:
         cfg_file = REPO / "overlays" / a.overlay / "overlay.json"
         try:
@@ -405,8 +409,10 @@ def main() -> None:
         except (OSError, ValueError) as e:
             raise SystemExit("start: cannot read %s (%s)" % (cfg_file, e))
         collection, mascot = cfg["collection"], bool(cfg.get("mascot"))
-        say("start", "overlay %s -- collection %r%s" % (
-            a.overlay, collection, "" if mascot else ", no mascot"))
+        heart = bool(cfg.get("heart"))
+        say("start", "overlay %s -- collection %r%s%s" % (
+            a.overlay, collection, "" if mascot else ", no mascot",
+            ", live heart rate" if heart else ""))
 
     job = Job()
     bridges = []
@@ -425,6 +431,12 @@ def main() -> None:
         elif ensure_chat():
             bridges.append(Bridge("chat", [str(VENV_PY), "-u",
                                   str(CHAT / "chat-bridge.py")], TTS_PORT, job))
+    if a.only == "heart" or (a.only is None and heart):
+        if listening(HEART_PORT):
+            say("heart", "already listening on %d -- leaving it" % HEART_PORT)
+        else:
+            bridges.append(Bridge("heart", [sys.executable, "-u",
+                                  str(REPO / "heart/heart-bridge.py")], HEART_PORT, job))
 
     threads = [b.start() for b in bridges]
 

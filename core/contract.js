@@ -18,7 +18,7 @@ window.OVERLAY_CONTRACT = {
     "tts": "Tts",
     "discord": "Discord"
   },
-  "ports": { "obs": 4455, "mascot": 4460, "chat": 4461 },
+  "ports": { "obs": 4455, "mascot": 4460, "chat": 4461, "heart": 4462 },
   "socials": [
     { "handle": "thedeepeffect", "on": ["kick"] },
     { "handle": "thedeepeffect_", "on": ["twitch", "youtube"] },
