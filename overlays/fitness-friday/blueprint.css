@@ -1,0 +1,973 @@
+/* overlays/fitness-friday/blueprint.css -- what every Fitness Friday page
+   draws alike: the palette, the sheet, the plates, the HUGE type, the title
+   block, the windows and the sting. Each page keeps only its canvas size and
+   where things sit. */
+:root {
+  --royal: #1c41d4; /* the sheet, at its centre */
+  --royal-deep: #0f2690; /* its edges, and type on yellow */
+  --plate: #2149dc; /* fill under a drawing: a part, lifted off the grid */
+  --ink: #ffd60a; /* the yellow: drawings and highlights */
+  --paper: #f4f7ff; /* HUGE type */
+  --line: rgba(226, 235, 255, 0.64); /* rules, captions, dimension lines */
+  --faint: rgba(226, 235, 255, 0.28);
+  --grid: rgba(214, 226, 255, 0.075);
+  --grid-major: rgba(214, 226, 255, 0.16);
+  --f-huge: Anton, "Arial Narrow", Impact, sans-serif;
+  --f-mono: "JetBrains Mono", Consolas, monospace;
+}
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+body {
+  /* Transparent: a dead browser source shows what OBS has behind it. */
+  background: transparent;
+  overflow: hidden;
+  width: var(--canvas-w);
+  height: var(--canvas-h);
+  color: var(--paper);
+  font-family: var(--f-mono);
+  -webkit-font-smoothing: antialiased;
+}
+.viewport {
+  position: fixed;
+  inset: 0;
+  width: var(--canvas-w);
+  height: var(--canvas-h);
+  overflow: hidden;
+}
+
+/* ---- the page of panels: holes only, no paint ---------------------- */
+.shaker,
+.page {
+  position: absolute;
+  inset: 0;
+  transform-origin: 0 0;
+}
+.page {
+  width: 13000px;
+}
+.skirt-n,
+.skirt-s,
+.skirt-w,
+.skirt-e,
+.page-under,
+.under,
+.panel-tag {
+  display: none;
+}
+.panel {
+  position: absolute;
+  overflow: hidden;
+  border: 15px solid transparent;
+}
+.hole {
+  position: absolute;
+  overflow: hidden;
+  border: 0;
+}
+.fake-source {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: repeating-linear-gradient(135deg, #0c1f6e 0 18px, #10267f 18px 36px);
+}
+.src-label {
+  font: 700 24px var(--f-mono);
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: rgba(255, 214, 10, 0.5);
+}
+.hole.punched .fake-source {
+  display: none;
+}
+body.preview .hole.punched .fake-source {
+  display: grid;
+}
+
+/* ---- the sheet ----------------------------------------------------- */
+#sheet,
+#sheet-bg,
+#zones,
+#scenes,
+.scene {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+#sheet-bg {
+  width: var(--canvas-w);
+  height: var(--canvas-h);
+}
+.zones {
+  position: absolute;
+  inset: 0;
+  width: var(--canvas-w);
+  height: var(--canvas-h);
+}
+.zones path {
+  fill: none;
+  stroke: var(--line);
+  stroke-width: 1.2;
+}
+.zones text {
+  fill: var(--faint);
+  font: 500 11px var(--f-mono);
+  text-anchor: middle;
+}
+/* A scene drawn as bands only (the horizontal GAME) has no border. */
+body.bands #zones {
+  display: none;
+}
+.scene {
+  display: none;
+}
+.scene.on,
+.scene.measure {
+  display: block;
+}
+.scene.measure:not(.on) {
+  visibility: hidden;
+}
+
+/* ---- HUGE type: each line fitted to its box at boot ----------------- */
+.huge {
+  position: absolute;
+  font-family: var(--f-huge);
+  text-transform: uppercase;
+  line-height: 0.86;
+  letter-spacing: 0.004em;
+  color: var(--paper);
+}
+.huge .ln {
+  display: block;
+  white-space: nowrap;
+}
+.huge .fit {
+  display: inline-block;
+}
+.huge em {
+  font-style: normal;
+  color: var(--ink);
+}
+/* A line set as an outline: the sheet's construction stroke. */
+.huge .o {
+  color: transparent;
+  -webkit-text-stroke: 2px var(--ink);
+}
+.fig {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font: 500 15px var(--f-mono);
+  letter-spacing: 0.18em;
+  color: var(--line);
+  white-space: nowrap;
+}
+.fig.inline {
+  position: static;
+}
+.fig b {
+  color: var(--ink);
+  font-weight: 700;
+}
+.fig i {
+  width: 48px;
+  height: 1.5px;
+  background: var(--line);
+}
+.note {
+  position: absolute;
+  font: 500 15px var(--f-mono);
+  letter-spacing: 0.14em;
+  line-height: 1.6;
+  color: var(--line);
+}
+.note b {
+  color: var(--ink);
+  font-weight: 700;
+}
+.dimh {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 14px;
+  font: 500 12px var(--f-mono);
+  letter-spacing: 0.22em;
+  color: var(--line);
+  border-left: 1.5px solid var(--line);
+  border-right: 1.5px solid var(--line);
+}
+.dimh::before,
+.dimh::after {
+  content: "";
+  flex: 1;
+  height: 1.5px;
+  background: var(--line);
+}
+.dimh span {
+  white-space: nowrap;
+}
+
+/* ---- the countdown -------------------------------------------------- */
+.count {
+  position: absolute;
+  display: flex;
+  align-items: flex-end;
+  gap: 26px;
+}
+.count small {
+  font: 500 14px var(--f-mono);
+  letter-spacing: 0.24em;
+  color: var(--line);
+  line-height: 1.5;
+  padding-bottom: 14px;
+}
+.count small b {
+  display: block;
+  color: var(--ink);
+}
+#countdown {
+  font-family: var(--f-huge);
+  font-size: 150px;
+  line-height: 0.8;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+}
+
+/* ---- plates --------------------------------------------------------- */
+.plate {
+  position: absolute;
+}
+.plate-body,
+.plate-move {
+  position: absolute;
+  inset: 0;
+}
+.plate-move {
+  will-change: transform;
+}
+.plate-art,
+.plate-notes {
+  position: absolute;
+  left: 0;
+  top: 0;
+  overflow: visible;
+}
+.plate path {
+  vector-effect: non-scaling-stroke;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.plate path.k-solid {
+  fill: var(--plate);
+  stroke: var(--ink);
+  stroke-width: 2.4;
+}
+.plate path.k-bold {
+  stroke: var(--ink);
+  stroke-width: 2.4;
+}
+.plate path.k-line {
+  stroke: var(--ink);
+  stroke-width: 1.5;
+}
+.plate path.k-fine {
+  stroke: var(--ink);
+  stroke-width: 1;
+  opacity: 0.86;
+}
+.plate path.k-hair {
+  stroke: var(--ink);
+  stroke-width: 0.8;
+  opacity: 0.7;
+}
+.plate path.k-ghost {
+  stroke: var(--paper);
+  stroke-width: 0.9;
+  opacity: 0.24;
+}
+.plate path.k-dash {
+  stroke: var(--paper);
+  stroke-width: 1.1;
+  opacity: 0.5;
+  stroke-dasharray: 6 5;
+}
+.plate path.k-center {
+  stroke: var(--paper);
+  stroke-width: 1;
+  opacity: 0.42;
+  stroke-dasharray: 22 6 3 6;
+}
+.plate path.k-dim {
+  stroke: var(--paper);
+  stroke-width: 1.1;
+  opacity: 0.6;
+}
+.plate-art text {
+  fill: var(--line);
+  font-family: var(--f-mono);
+  font-weight: 500;
+  letter-spacing: 0.12em;
+}
+.plate-notes .lead {
+  stroke: var(--paper);
+  stroke-width: 1;
+  opacity: 0.6;
+  fill: none;
+  vector-effect: none;
+}
+.plate-notes .dot {
+  fill: var(--ink);
+}
+.plate-notes .ball {
+  fill: var(--royal-deep);
+  stroke: var(--ink);
+  stroke-width: 1.6;
+}
+.plate-notes text {
+  fill: var(--ink);
+  font: 700 13px var(--f-mono);
+  text-anchor: middle;
+}
+.scan {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.scan::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -100%;
+  height: 100%;
+  opacity: 0;
+  background: linear-gradient(to bottom, transparent calc(100% - 60px), rgba(255, 214, 10, 0.2) calc(100% - 2px), var(--ink) calc(100% - 2px));
+}
+
+/* The idle motion. Each is a transform on its own layer, so the compositor
+   does it and nothing repaints. */
+.anim-beat {
+  /* --beat is HEART's: 833ms (72 bpm) until the watch sends a rate. */
+  animation: ff-beat var(--beat, 833ms) infinite;
+}
+/* The readout: a dot beats beside BPM while the rate is live; a lost
+   feed dims to a dash. */
+.bpm small::before {
+  content: "";
+  display: inline-block;
+  width: 0.5em;
+  height: 0.5em;
+  margin-right: 0.5em;
+  border-radius: 50%;
+  background: var(--ink);
+  vertical-align: 0.05em;
+  opacity: 0;
+}
+body[data-hr="live"] .bpm small::before {
+  opacity: 1;
+  animation: ff-dot var(--beat, 833ms) infinite;
+}
+@keyframes ff-dot {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  10% {
+    opacity: 1;
+  }
+}
+body[data-hr="lost"] .bpm {
+  opacity: 0.45;
+}
+@keyframes ff-beat {
+  0%,
+  42%,
+  100% {
+    transform: scale(1);
+  }
+  10% {
+    transform: scale(1.045);
+  }
+  20% {
+    transform: scale(1.004);
+  }
+  30% {
+    transform: scale(1.026);
+  }
+}
+.anim-breathe {
+  animation: ff-breathe 8s ease-in-out infinite;
+}
+@keyframes ff-breathe {
+  0%,
+  100% {
+    transform: scale(1, 1);
+  }
+  40%,
+  55% {
+    transform: scale(1.03, 1.055);
+  }
+}
+.anim-wave {
+  animation: ff-wave 2.8s ease-in-out infinite;
+}
+@keyframes ff-wave {
+  0%,
+  100% {
+    transform: rotate(-7deg);
+  }
+  50% {
+    transform: rotate(6deg);
+  }
+}
+
+/* ---- parts list, title block, socials -------------------------------- */
+.parts {
+  position: absolute;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border: 1.5px solid var(--line);
+  font: 500 13px var(--f-mono);
+  letter-spacing: 0.08em;
+}
+.parts.one {
+  grid-template-columns: 1fr;
+}
+.parts > div {
+  display: flex;
+  gap: 12px;
+  padding: 5px 12px;
+  border-bottom: 1px solid var(--faint);
+  white-space: nowrap;
+}
+.parts > div:nth-last-child(-n + 2) {
+  border-bottom: 0;
+}
+.parts.one > div:nth-last-child(2) {
+  border-bottom: 1px solid var(--faint);
+}
+.parts b {
+  color: var(--ink);
+  width: 12px;
+}
+.parts .parts-h {
+  grid-column: 1 / -1;
+  color: var(--faint);
+  font-size: 10px;
+  letter-spacing: 0.26em;
+  border-bottom: 1px solid var(--line) !important;
+}
+.parts-h span:first-child {
+  width: 46px;
+}
+.tblock {
+  position: absolute;
+  display: grid;
+  grid-template-columns: 1.5fr 1fr 1fr;
+  border: 1.5px solid var(--line);
+}
+.tblock > * {
+  border-right: 1px solid var(--faint);
+  border-bottom: 1px solid var(--faint);
+  padding: 7px 14px;
+  min-width: 0;
+}
+.tblock > :nth-child(3),
+.tblock > :nth-child(6) {
+  border-right: 0;
+}
+.tb-name {
+  font-family: var(--f-huge);
+  font-size: 40px;
+  line-height: 1.05;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+.tb-name em {
+  font-style: normal;
+  color: var(--ink);
+}
+.tb-cell small {
+  display: block;
+  font-size: 10px;
+  letter-spacing: 0.26em;
+  color: var(--faint);
+}
+.tb-cell b {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+/* Narrow: two columns, the name and the title across both, socials stacked. */
+.tblock.narrow {
+  grid-template-columns: 1fr 1fr;
+}
+.tblock.narrow > * {
+  border-right: 0;
+}
+.tblock.narrow > :nth-child(2),
+.tblock.narrow > :nth-child(5) {
+  border-right: 1px solid var(--faint);
+}
+.tblock.narrow .tb-name,
+.tblock.narrow .tb-wide {
+  grid-column: 1 / -1;
+}
+.soc.stack {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+.tb-soc {
+  grid-column: 1 / -1;
+  border-bottom: 0 !important;
+  border-right: 0 !important;
+  padding: 10px 14px;
+}
+.soc {
+  display: flex;
+  gap: 26px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.soc-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font: 600 15px var(--f-mono);
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+.soc-item img {
+  width: 20px;
+  height: 20px;
+}
+
+/* ---- windows -------------------------------------------------------- */
+.win {
+  position: absolute;
+  border: 3px solid var(--ink);
+}
+.win .c {
+  position: absolute;
+  width: 26px;
+  height: 26px;
+  border: 0 solid var(--ink);
+}
+.win .tl {
+  left: -14px;
+  top: -14px;
+  border-width: 3px 0 0 3px;
+}
+.win .tr {
+  right: -14px;
+  top: -14px;
+  border-width: 3px 3px 0 0;
+}
+.win .bl {
+  left: -14px;
+  bottom: -14px;
+  border-width: 0 0 3px 3px;
+}
+.win .br {
+  right: -14px;
+  bottom: -14px;
+  border-width: 0 3px 3px 0;
+}
+.win-tab {
+  position: absolute;
+  left: -3px;
+  top: -3px;
+  background: var(--ink);
+  color: var(--royal-deep);
+  font: 700 13px var(--f-mono);
+  letter-spacing: 0.18em;
+  padding: 6px 12px 5px;
+  white-space: nowrap;
+}
+.win.tab-tr .win-tab {
+  left: auto;
+  right: -3px;
+}
+.win.tab-bl .win-tab {
+  top: auto;
+  bottom: -3px;
+}
+
+/* ---- the BPM readout and the breathing cue --------------------------- */
+.bpm {
+  position: absolute;
+  font-family: var(--f-huge);
+  line-height: 0.8;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.bpm small {
+  font: 600 14px var(--f-mono);
+  letter-spacing: 0.24em;
+  color: var(--line);
+  margin-left: 10px;
+}
+.cue {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  font: 600 15px var(--f-mono);
+  letter-spacing: 0.24em;
+  color: var(--faint);
+}
+.cue span {
+  animation: 8s infinite step-end;
+}
+.cue .c-in {
+  animation-name: ff-cue-in;
+}
+.cue .c-hold {
+  animation-name: ff-cue-hold;
+}
+.cue .c-out {
+  animation-name: ff-cue-out;
+}
+.cue .bar {
+  width: 420px;
+  height: 6px;
+  border: 1.5px solid var(--line);
+  position: relative;
+}
+.cue .bar::after {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  background: var(--ink);
+  transform-origin: 0 50%;
+  animation: ff-cue-bar 8s ease-in-out infinite;
+}
+/* In step with .anim-breathe: in for 40%, hold to 55%, out to 100%. */
+@keyframes ff-cue-bar {
+  0%,
+  100% {
+    transform: scaleX(0);
+  }
+  40%,
+  55% {
+    transform: scaleX(1);
+  }
+}
+@keyframes ff-cue-in {
+  0% {
+    color: var(--ink);
+  }
+  40% {
+    color: var(--faint);
+  }
+}
+@keyframes ff-cue-hold {
+  0% {
+    color: var(--faint);
+  }
+  40% {
+    color: var(--ink);
+  }
+  55% {
+    color: var(--faint);
+  }
+}
+@keyframes ff-cue-out {
+  0% {
+    color: var(--faint);
+  }
+  55% {
+    color: var(--ink);
+  }
+}
+
+/* ---- the ECG -------------------------------------------------------- */
+.ecg {
+  position: absolute;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
+}
+.ecg-run {
+  position: absolute;
+  left: 0;
+  top: 0;
+  animation: ff-ecg linear infinite;
+  will-change: transform;
+}
+.ecg path {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 2.2;
+  stroke-linejoin: round;
+}
+@keyframes ff-ecg {
+  to {
+    transform: translateX(var(--shift));
+  }
+}
+
+/* ---- a scene arriving: type rises, plates scan in ------------------- */
+.scene.enter .huge .ln {
+  animation: ff-rise 0.6s cubic-bezier(0.16, 0.9, 0.24, 1) both;
+  animation-delay: calc(60ms + var(--i) * 70ms);
+}
+@keyframes ff-rise {
+  from {
+    transform: translateY(70px);
+    opacity: 0;
+  }
+}
+.scene.enter .plate-body {
+  animation: ff-reveal 0.9s cubic-bezier(0.3, 0.6, 0.2, 1) both 0.12s;
+}
+@keyframes ff-reveal {
+  from {
+    clip-path: inset(0 0 100% 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+.scene.enter .scan::after {
+  animation: ff-scanline 0.9s cubic-bezier(0.3, 0.6, 0.2, 1) both 0.12s;
+}
+@keyframes ff-scanline {
+  from {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  92% {
+    opacity: 1;
+  }
+  to {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+}
+.scene.enter .win {
+  animation: ff-win 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both 0.05s;
+}
+@keyframes ff-win {
+  from {
+    outline: 3px solid var(--ink);
+    outline-offset: 22px;
+  }
+  to {
+    outline: 3px solid transparent;
+    outline-offset: 0;
+  }
+}
+.scene.enter .tblock,
+.scene.enter .parts,
+.scene.enter .fig,
+.scene.enter .note,
+.scene.enter .count,
+.scene.enter .soc {
+  animation: ff-fade 0.5s ease-out both 0.32s;
+}
+@keyframes ff-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+/* ---- the sting ------------------------------------------------------ */
+#sting {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 20;
+}
+.st-slab {
+  position: absolute;
+  top: 0;
+  left: -260px;
+  width: calc(var(--canvas-w) + 520px);
+  height: var(--canvas-h);
+  clip-path: polygon(260px 0, 100% 0, calc(100% - 260px) 100%, 0 100%);
+  will-change: transform;
+}
+.st-y {
+  background: var(--ink);
+}
+.st-b {
+  background:
+    linear-gradient(var(--grid-major) 1px, transparent 1px) 260px 0 / 120px 120px,
+    linear-gradient(90deg, var(--grid-major) 1px, transparent 1px) 260px 0 / 120px 120px,
+    linear-gradient(var(--grid) 1px, transparent 1px) 260px 0 / 24px 24px,
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px) 260px 0 / 24px 24px,
+    radial-gradient(ellipse at 50% 45%, #2552e4, var(--royal) 55%, var(--royal-deep));
+}
+.st-inner {
+  position: absolute;
+  left: 260px;
+  top: 0;
+  width: var(--canvas-w);
+  height: var(--canvas-h);
+}
+.st-flash {
+  position: absolute;
+  inset: 0;
+  background: var(--ink);
+  opacity: 0;
+}
+.st-flash.on {
+  opacity: 1;
+}
+.st-word,
+.st-ghost {
+  position: absolute;
+  inset: 0;
+  transform-origin: 50% 50%;
+}
+#sting text {
+  font-family: var(--f-huge);
+  text-anchor: middle;
+  text-transform: uppercase;
+}
+#sting .word {
+  fill: var(--paper);
+}
+#sting[data-tone="yellow"] .word {
+  fill: var(--ink);
+}
+#sting[data-tone="flash"] .word {
+  fill: var(--royal-deep);
+}
+#sting .ghost {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 2.5;
+}
+#sting[data-tone="flash"] .ghost {
+  stroke: var(--royal-deep);
+}
+.st-dim {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  height: 14px;
+  font: 600 13px var(--f-mono);
+  letter-spacing: 0.26em;
+  color: var(--line);
+  border-left: 1.5px solid currentColor;
+  border-right: 1.5px solid currentColor;
+}
+.st-dim::before,
+.st-dim::after {
+  content: "";
+  flex: 1;
+  height: 1.5px;
+  background: currentColor;
+}
+#sting[data-tone="flash"] .st-dim,
+#sting[data-tone="flash"] .st-slate {
+  color: var(--royal-deep);
+}
+.st-slate {
+  position: absolute;
+  font: 600 14px var(--f-mono);
+  letter-spacing: 0.24em;
+  color: var(--line);
+}
+.st-slate.tl {
+  left: 48px;
+  top: 40px;
+}
+.st-slate.tr {
+  right: 48px;
+  top: 40px;
+}
+.st-slate.bl {
+  left: 48px;
+  bottom: 38px;
+}
+.st-slate.br {
+  right: 48px;
+  bottom: 38px;
+}
+
+/* ---- preview only: outside OBS, the area round the scaled canvas and the
+   scene buttons. Never drawn in OBS. ------------------------------------- */
+body.preview {
+  background: #070c24;
+}
+.preview-bar {
+  position: fixed;
+  left: 50%;
+  bottom: 10px;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+  background: rgba(7, 12, 36, 0.88);
+  border: 1px solid rgba(255, 214, 10, 0.5);
+  z-index: 70;
+}
+.preview-bar button {
+  font: 700 12px var(--f-mono);
+  letter-spacing: 0.12em;
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid rgba(255, 214, 10, 0.35);
+  padding: 7px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.preview-bar button.on {
+  background: var(--ink);
+  color: var(--royal-deep);
+}
+
+/* ---- debug HUD, ?debug=1 only --------------------------------------- */
+.hud {
+  position: absolute;
+  right: 14px;
+  top: 14px;
+  max-width: 720px;
+  background: rgba(5, 10, 40, 0.93);
+  border: 2px solid var(--ink);
+  padding: 11px 13px;
+  font: 12px/1.55 var(--f-mono);
+  color: var(--ink);
+  z-index: 60;
+  pointer-events: none;
+  white-space: pre;
+}
+.hud h4 {
+  font-size: 15px;
+  letter-spacing: 0.14em;
+  margin-bottom: 6px;
+}
+.hud .off {
+  color: #4a4a55;
+}
+.hud .warn {
+  color: #ff8a5c;
+}
+.hud[hidden] {
+  display: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .anim-beat,
+  .anim-breathe,
+  .anim-wave,
+  .ecg-run {
+    animation: none;
+  }
+}

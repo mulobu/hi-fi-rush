@@ -1,0 +1,16 @@
+{
+  "_comment": [
+    "collection: the OBS scene collection this overlay lives in (docs/adr/0003).",
+    "  tools/obs-setup.py --overlay fitness-friday creates it.",
+    "chat: the Chat source's size, equal to the CHAT window in overlay.html,",
+    "  so the source fills it with nothing cropped (docs/adr/0015).",
+    "No mascot key and no transition filter: the sting is drawn by the page",
+    "  (sheet.js, docs/adr/0027).",
+    "heart: start.py runs heart/heart-bridge.py for this overlay, which the",
+    "  watch app posts to and the pages read their live BPM from (docs/adr/0028)."
+  ],
+  "name": "Fitness Friday",
+  "collection": "Fitness Friday",
+  "chat": { "width": 560, "height": 952 },
+  "heart": true
+}

@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Fitness Friday — Vertical</title>
+    <!--
+      Fitness Friday on the vertical canvas: 1080 x 1920, driven by the MAIN
+      canvas's program scene, so one deck press moves both pages. Finding the
+      canvas, its scene and the platform safe zones is core/vertical.js. The
+      plates, the sheet, the sting and the live heart rate are anatomy.js,
+      sheet.js and blueprint.css, shared with overlay.html. What is here is
+      the portrait layout.
+
+      Face on top. Every cam window is 16:9 (docs/adr/0014); Chat keeps
+      overlay.json's 560:952 (docs/adr/0015). Type stays inside SAFE_* (x
+      under 916, y 140 to 1596); windows and plates may cross the right rail
+      and sit under the caption zone, text never does.
+    -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Anton&family=JetBrains+Mono:wght@500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="blueprint.css" />
+    <style>
+      :root {
+        --canvas-w: 1080px;
+        --canvas-h: 1920px;
+      }
+      /* The sting's corner labels, inside the safe zone. */
+      .st-slate.tl,
+      .st-slate.tr {
+        top: 160px;
+      }
+      .st-slate.bl,
+      .st-slate.br {
+        bottom: 340px;
+      }
+      .st-slate.tr,
+      .st-slate.br {
+        right: 180px;
+      }
+      .cue .bar {
+        width: 300px;
+      }
+      .v-title {
+        position: absolute;
+        display: flex;
+        align-items: baseline;
+        gap: 18px;
+        font-family: var(--f-huge);
+        line-height: 1;
+        white-space: nowrap;
+      }
+      .v-title em {
+        font-style: normal;
+        color: var(--ink);
+      }
+    </style>
+  </head>
+  <body data-scene="">
+    <div class="viewport" id="viewport">
+      <div class="shaker" id="shaker"><div class="page" id="page"></div></div>
+      <div id="sheet">
+        <svg id="sheet-bg" viewBox="0 0 1080 1920">
+          <defs>
+            <radialGradient id="ff-royal" gradientUnits="userSpaceOnUse" cx="500" cy="860" r="1300">
+              <stop offset="0" stop-color="#2552e4" />
+              <stop offset="0.5" stop-color="#1c41d4" />
+              <stop offset="1" stop-color="#0f2690" />
+            </radialGradient>
+            <pattern id="ff-grid" width="24" height="24" patternUnits="userSpaceOnUse">
+              <path d="M24 0H0V24" fill="none" stroke="rgba(214,226,255,.075)" stroke-width="1" />
+            </pattern>
+            <pattern id="ff-grid-major" width="120" height="120" patternUnits="userSpaceOnUse">
+              <path d="M120 0H0V120" fill="none" stroke="rgba(214,226,255,.16)" stroke-width="1" />
+            </pattern>
+          </defs>
+          <path fill="url(#ff-royal)" fill-rule="evenodd" d="M0 0H1080V1920H0Z" />
+          <path fill="url(#ff-grid)" fill-rule="evenodd" d="M0 0H1080V1920H0Z" />
+          <path fill="url(#ff-grid-major)" fill-rule="evenodd" d="M0 0H1080V1920H0Z" />
+        </svg>
+        <div id="zones"></div>
+        <div id="scenes"></div>
+      </div>
+      <div id="sting" data-tone="white">
+        <div class="st-slab st-y"></div>
+        <div class="st-slab st-b">
+          <div class="st-inner">
+            <div class="st-flash"></div>
+            <div class="st-ghost"></div>
+            <div class="st-word"></div>
+            <div class="st-dim"><span></span></div>
+            <span class="st-slate tl">FITNESS FRIDAY</span>
+            <span class="st-slate tr st-fig">FIG. 00</span>
+            <span class="st-slate bl">THE DEEP EFFECT</span>
+            <span class="st-slate br">SCALE 1 : 1</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="hud" id="hud" hidden>
+      <h4>FITNESS FRIDAY VERTICAL DEBUG</h4>
+      <div id="hudState"></div>
+      <div id="hudRects"></div>
+      <div id="hudLog"></div>
+    </div>
+
+    <script src="../../core/contract.js"></script>
+    <script src="../../core/base.js"></script>
+    <script src="../../core/vertical.js"></script>
+    <script src="anatomy.js"></script>
+    <script>
+      const CANVAS_W = 1080,
+        CANVAS_H = 1920;
+    </script>
+    <script src="sheet.js"></script>
+    <script>
+      /* ================================================================
+   WINDOWS -- in canvas px. Face on top. GAME's stack is centred on the
+   canvas: cam 432, title, game 608.
+   ================================================================ */
+      const WIN = {
+        gameCam: [156, 206, 768, 432],
+        game: [0, 790, 1080, 608],
+        chatCam: [48, 196, 768, 432],
+        chat: [448, 660, 468, 796],
+        cam: [0, 196, 1080, 608],
+        endCam: [48, 190, 832, 468],
+      };
+      const PANELS = [
+        panel(1, "start", []),
+        panel(2, "chat", [hole("Cam", WIN.chatCam), hole("Chat", WIN.chat)]),
+        panel(3, "game", [hole("Cam", WIN.gameCam), hole("Game", WIN.game)]),
+        panel(4, "cam", [hole("Cam", WIN.cam)]),
+        panel(5, "brb", []),
+        panel(6, "end", [hole("Cam", WIN.endCam)]),
+      ];
+      /* The sting's words stay inside the platform safe zone. */
+      const STING_BOX = { x: 48, y: SAFE_TOP, w: CANVAS_W - SAFE_RIGHT - 48 - SAFE_PAD, h: CANVAS_H - SAFE_TOP - SAFE_BOTTOM };
+
+      const PLATES = {
+        body: ANATOMY.body(),
+        heart: ANATOMY.heart(),
+        brain: ANATOMY.brain(),
+        lungs: ANATOMY.lungs(),
+        hand: ANATOMY.hand(),
+      };
+      const plain = { balloons: false };
+
+      const SCENES = {
+        start: {
+          words: ["FITNESS", "FRIDAY"],
+          html: () =>
+            fig("01", "CORPUS HUMANUM", 56, 160) +
+            huge(["STARTING", "<em>SOON</em>"], { x: 52, y: 192, w: 820 }) +
+            `<div class="count" style="left:56px;top:800px;flex-direction:column;align-items:flex-start;gap:14px"><small>T-MINUS<b>MM : SS</b></small><div id="countdown">05:00</div></div>` +
+            titleBlock("start", "CORPUS HUMANUM", { x: 56, y: 1150, w: 380, cls: "narrow" }) +
+            renderPlate(PLATES.body, { x: 430, y: 760, w: 640, h: 1110 }, plain),
+        },
+        chat: {
+          words: ["LET'S", "TALK"],
+          html: () =>
+            win(WIN.chatCam, "CAM · 16:9") +
+            win(WIN.chat, "CHAT", { tab: "tr" }) +
+            fig("02", "ENCEPHALON", 56, 672) +
+            huge(["LET'S", "<em>TALK</em>"], { x: 52, y: 704, w: 360, same: true }) +
+            renderPlate(PLATES.brain, { x: 36, y: 1062, w: 396, h: 290 }, plain) +
+            socialsRow("stack", "position:absolute;left:56px;top:1384px"),
+        },
+        game: {
+          words: ["GAME", "ON"],
+          html: () =>
+            fig("03", "PULSUS · CARDIAC OUTPUT", 56, 160) +
+            win(WIN.gameCam, "CAM") +
+            `<div class="v-title" style="left:56px;top:676px;font-size:84px"><span>FITNESS <em>FRIDAY</em></span></div>` +
+            win(WIN.game, "GAME", { tab: "tl", corners: [] }) +
+            ecgStrip(56, 1420, 560, 60, { beat: 150 }) +
+            renderPlate(PLATES.heart, { x: 640, y: 1412, w: 70, h: 76 }, { balloons: false, lite: true, anim: "anim-beat" }) +
+            bpmReadout(726, 1430, 52) +
+            socialsRow("", "position:absolute;left:56px;top:1516px;width:860px"),
+        },
+        cam: {
+          words: ["UP", "CLOSE"],
+          html: () =>
+            fig("04", "COR · ANTERIOR", 56, 160) +
+            win(WIN.cam, "CAM · LIVE", { corners: [] }) +
+            huge(["THE DEEP", "<em>EFFECT</em>"], { x: 52, y: 834, w: 820, same: true }) +
+            bpmReadout(56, 1316, 96) +
+            ecgStrip(56, 1410, 420, 54, { beat: 140 }) +
+            socialsRow("stack", "position:absolute;left:56px;top:1486px") +
+            renderPlate(PLATES.heart, { x: 500, y: 1270, w: 440, h: 470 }, { balloons: false, anim: "anim-beat" }),
+        },
+        brb: {
+          words: ["BE", "RIGHT", "BACK"],
+          html: () =>
+            fig("05", "PULMONES · ANTERIOR", 56, 160) +
+            huge(["BE RIGHT", "<em>BACK</em>"], { x: 52, y: 192, w: 820 }) +
+            renderPlate(PLATES.lungs, { x: 40, y: 806, w: 900, h: 614 }, { balloons: false, anim: "anim-breathe" }) +
+            `<div class="cue" style="left:56px;top:1440px"><span class="c-in">INHALE</span><span class="c-hold">HOLD</span><span class="c-out">EXHALE</span><i class="bar"></i></div>` +
+            socialsRow("", "position:absolute;left:56px;top:1500px;width:860px"),
+        },
+        end: {
+          words: ["THAT'S", "A", "WRAP"],
+          html: () =>
+            fig("06", "MANUS · XXVII OSSA", 56, 160) +
+            win(WIN.endCam, "CAM") +
+            huge(["SEE YOU", "NEXT", "<em>FRIDAY</em>"], { x: 52, y: 690, w: 820, same: true }) +
+            socialsRow("stack", "position:absolute;left:56px;top:1420px") +
+            renderPlate(PLATES.hand, { x: 440, y: 1420, w: 520, h: 520 }, { balloons: false, anim: "anim-wave", ay: 0 }),
+        },
+      };
+    </script>
+    <script src="../../core/socials.js"></script>
+    <script src="../../core/panel-page.js"></script>
+    <script src="../../core/obs-link.js"></script>
+    <script src="../../core/holes.js"></script>
+    <script src="../../core/hud.js"></script>
+    <script>
+      /* BOOT. No obsstudio seed: on the vertical canvas the websocket is the
+         primary path (core/vertical.js). `?scene=` names the OBS scene there,
+         so a standalone preview is `?preview=GAME`. */
+      startSheet();
+      const PAGE = verticalPage("vertical");
+      if (!window.obsstudio) document.body.classList.add("preview");
+      applyPunch(-1); /* nothing live yet: the frame is covered */
+      const fixed = params.get("preview");
+      standalone = !!fixed;
+      if (fixed) goTo(String(SCENE_MAP[fixed.toUpperCase()] || 1), { instant: true });
+      else {
+        listenObsStudio();
+        connect();
+      }
+      startHud();
+    </script>
+  </body>
+</html>

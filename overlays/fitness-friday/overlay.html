@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Fitness Friday — OBS</title>
+    <!--
+      Fitness Friday: a royal blue drafting sheet with HUGE type and yellow
+      anatomy plates -- the body, the brain, the heart, the lungs, the hand.
+      Each scene is a sheet with its windows cut out; the video shows
+      through them. A switch is the sting (sheet.js, docs/adr/0027): slabs
+      sweep across, the next scene's words slam in one at a time, filling
+      the frame, and the slabs sweep off the new sheet.
+
+      Everything that talks to OBS is core/. This page is the layout: its
+      windows, which plate goes where, and the words. anatomy.js draws the
+      plates, sheet.js builds the sheet and runs the sting, blueprint.css is
+      every style both pages share. CLAUDE.md here has the design.
+    -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Anton&family=JetBrains+Mono:wght@500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="blueprint.css" />
+    <style>
+      :root {
+        --canvas-w: 1920px;
+        --canvas-h: 1080px;
+      }
+      /* GAME's bands: a yellow rule on each inner edge. */
+      .band-rule {
+        position: absolute;
+        height: 3px;
+        background: var(--ink);
+      }
+      .g-head {
+        position: absolute;
+        left: 28px;
+        top: 0;
+        height: 44px;
+        display: flex;
+        align-items: center;
+      }
+      .g-soc {
+        position: absolute;
+        right: 28px;
+        top: 0;
+        height: 44px;
+        display: flex;
+        align-items: center;
+      }
+      .g-title {
+        position: absolute;
+        left: 580px;
+        top: 1016px;
+        height: 64px;
+        display: flex;
+        align-items: center;
+        gap: 22px;
+        font-family: var(--f-huge);
+        font-size: 50px;
+        line-height: 1;
+        white-space: nowrap;
+      }
+      .g-title em {
+        font-style: normal;
+        color: var(--ink);
+      }
+      .g-title small {
+        font: 500 13px var(--f-mono);
+        letter-spacing: 0.22em;
+        color: var(--line);
+      }
+    </style>
+  </head>
+  <body data-scene="">
+    <div class="viewport" id="viewport">
+      <div class="shaker" id="shaker"><div class="page" id="page"></div></div>
+      <div id="sheet">
+        <svg id="sheet-bg" viewBox="0 0 1920 1080">
+          <defs>
+            <radialGradient id="ff-royal" gradientUnits="userSpaceOnUse" cx="900" cy="470" r="1250">
+              <stop offset="0" stop-color="#2552e4" />
+              <stop offset="0.5" stop-color="#1c41d4" />
+              <stop offset="1" stop-color="#0f2690" />
+            </radialGradient>
+            <pattern id="ff-grid" width="24" height="24" patternUnits="userSpaceOnUse">
+              <path d="M24 0H0V24" fill="none" stroke="rgba(214,226,255,.075)" stroke-width="1" />
+            </pattern>
+            <pattern id="ff-grid-major" width="120" height="120" patternUnits="userSpaceOnUse">
+              <path d="M120 0H0V120" fill="none" stroke="rgba(214,226,255,.16)" stroke-width="1" />
+            </pattern>
+          </defs>
+          <path fill="url(#ff-royal)" fill-rule="evenodd" d="M0 0H1920V1080H0Z" />
+          <path fill="url(#ff-grid)" fill-rule="evenodd" d="M0 0H1920V1080H0Z" />
+          <path fill="url(#ff-grid-major)" fill-rule="evenodd" d="M0 0H1920V1080H0Z" />
+        </svg>
+        <div id="zones"></div>
+        <div id="scenes"></div>
+      </div>
+      <div id="sting" data-tone="white">
+        <div class="st-slab st-y"></div>
+        <div class="st-slab st-b">
+          <div class="st-inner">
+            <div class="st-flash"></div>
+            <div class="st-ghost"></div>
+            <div class="st-word"></div>
+            <div class="st-dim"><span></span></div>
+            <span class="st-slate tl">FITNESS FRIDAY</span>
+            <span class="st-slate tr st-fig">FIG. 00</span>
+            <span class="st-slate bl">THE DEEP EFFECT</span>
+            <span class="st-slate br">SCALE 1 : 1</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="hud" id="hud" hidden>
+      <h4>FITNESS FRIDAY DEBUG</h4>
+      <div id="hudState"></div>
+      <div id="hudRects"></div>
+      <div id="hudLog"></div>
+    </div>
+
+    <script src="../../core/contract.js"></script>
+    <script src="../../core/base.js"></script>
+    <script src="anatomy.js"></script>
+    <script>
+      const CANVAS_W = 1920,
+        CANVAS_H = 1080;
+    </script>
+    <script src="sheet.js"></script>
+    <script>
+      /* ================================================================
+   WINDOWS -- in canvas px. Every cam window is 16:9, the iPhone's
+   shape (docs/adr/0014); Chat is overlay.json's 560 x 952, so its
+   source fills it uncropped (docs/adr/0015).
+   ================================================================ */
+      const WIN = {
+        gameCam: [0, 710, 544, 306],
+        chatCam: [48, 64, 1216, 684],
+        chat: [1312, 64, 560, 952],
+        cam: [40, 40, 1472, 828],
+        endCam: [1032, 96, 816, 459],
+      };
+      const PANELS = [
+        panel(1, "start", []),
+        panel(2, "chat", [hole("Cam", WIN.chatCam), hole("Chat", WIN.chat)]),
+        /* The game is the whole frame and the bands cover its edges; the
+           cam window sits inside it, so mergeCuts drops its cut. */
+        panel(3, "game", [hole("Game", FULL), hole("Cam", WIN.gameCam)]),
+        panel(4, "cam", [hole("Cam", WIN.cam)]),
+        panel(5, "brb", []),
+        panel(6, "end", [hole("Cam", WIN.endCam)]),
+      ];
+
+      const PLATES = {
+        body: ANATOMY.body(),
+        heart: ANATOMY.heart(),
+        brain: ANATOMY.brain(),
+        lungs: ANATOMY.lungs(),
+        hand: ANATOMY.hand(),
+      };
+
+      /* ================================================================
+   SCENES -- per scene: the sting's words, and the sheet. html() runs at
+   boot, once SOCIALS exists.
+   ================================================================ */
+      const SCENES = {
+        start: {
+          words: ["FITNESS", "FRIDAY"],
+          html: () =>
+            fig("01", "CORPUS HUMANUM · ANTERIOR", 72, 60) +
+            huge(["STARTING", "<em>SOON</em>"], { x: 70, y: 94, w: 1040 }) +
+            titleBlock("start", "CORPUS HUMANUM", { x: 72, y: 872, w: 610 }) +
+            `<div class="count" style="left:730px;top:884px"><small>T-MINUS<b>MM : SS</b></small><div id="countdown">05:00</div></div>` +
+            renderPlate(PLATES.body, { x: 1230, y: 46, w: 660, h: 988 }, { balloons: false }),
+        },
+        chat: {
+          words: ["LET'S", "TALK"],
+          html: () =>
+            win(WIN.chatCam, "CAM · 16:9") +
+            win(WIN.chat, "CHAT", { tab: "tr" }) +
+            renderPlate(PLATES.brain, { x: 40, y: 770, w: 420, h: 280 }, { balloons: false }) +
+            fig("02", "ENCEPHALON · LATERAL", 492, 782) +
+            huge(["LET'S <em>TALK</em>"], { x: 488, y: 810, w: 776 }) +
+            socialsRow("", "position:absolute;left:492px;top:1000px"),
+        },
+        game: {
+          words: ["GAME", "ON"],
+          solid: [
+            [0, 0, 1920, 44],
+            [0, 1016, 1920, 64],
+          ],
+          html: () =>
+            `<i class="band-rule" style="left:0;top:41px;width:1920px"></i>` +
+            `<i class="band-rule" style="left:544px;top:1016px;width:1376px"></i>` +
+            `<div class="g-head">${fig("03", "PULSUS · CARDIAC OUTPUT", null, null, "inline")}</div>` +
+            `<div class="g-soc">${socialsRow()}</div>` +
+            win(WIN.gameCam, "CAM", { tab: "tr", corners: ["tr"] }) +
+            `<div class="g-title"><span>FITNESS <em>FRIDAY</em></span><small>SHEET 03 / 06</small></div>` +
+            ecgStrip(1110, 1022, 600, 52, { beat: 150 }) +
+            renderPlate(PLATES.heart, { x: 1724, y: 1018, w: 56, h: 60 }, { balloons: false, lite: true, anim: "anim-beat" }) +
+            bpmReadout(1790, 1032, 40),
+        },
+        cam: {
+          words: ["UP", "CLOSE"],
+          html: () =>
+            win(WIN.cam, "CAM · LIVE") +
+            huge(["THE DEEP <em>EFFECT</em>"], { x: 38, y: 898, w: 1090 }) +
+            `<div class="note" style="left:1170px;top:914px">HOST<br><b>ON CAMERA</b><br>FIG. 04 / COR</div>` +
+            fig("04", "COR · ANTERIOR", 1548, 52) +
+            renderPlate(PLATES.heart, { x: 1530, y: 80, w: 368, h: 392 }, { anim: "anim-beat" }) +
+            partsList(PLATES.heart, "one", "left:1548px;top:490px;width:340px") +
+            bpmReadout(1548, 760, 96) +
+            ecgStrip(1548, 838, 340, 54, { beat: 140 }) +
+            socialsRow("stack", "position:absolute;left:1548px;top:924px"),
+        },
+        brb: {
+          words: ["BE", "RIGHT", "BACK"],
+          html: () =>
+            renderPlate(PLATES.lungs, { x: 50, y: 90, w: 740, h: 800 }, { anim: "anim-breathe" }) +
+            partsList(PLATES.lungs, "", "left:72px;top:912px;width:700px") +
+            fig("05", "PULMONES · ANTERIOR", 832, 60) +
+            huge(["BE RIGHT", "<em>BACK</em>"], { x: 828, y: 94, w: 1000 }) +
+            `<div class="cue" style="left:832px;top:820px"><span class="c-in">INHALE</span><span class="c-hold">HOLD</span><span class="c-out">EXHALE</span><i class="bar"></i></div>` +
+            titleBlock("brb", "PULMONES", { x: 832, y: 872, w: 1016, scale: "1 : 2" }),
+        },
+        end: {
+          words: ["THAT'S", "A", "WRAP"],
+          html: () =>
+            win(WIN.endCam, "CAM") +
+            fig("06", "MANUS · XXVII OSSA", 72, 60) +
+            huge(["SEE YOU", "NEXT", "<em>FRIDAY</em>"], { x: 70, y: 94, w: 850, same: true }) +
+            titleBlock("end", "MANUS", { x: 72, y: 872, w: 900, scale: "1 : 1" }) +
+            renderPlate(PLATES.hand, { x: 1040, y: 580, w: 420, h: 470 }, { anim: "anim-wave", ay: 1 }) +
+            partsList(PLATES.hand, "one", "left:1480px;top:604px;width:368px"),
+        },
+      };
+    </script>
+    <script src="../../core/socials.js"></script>
+    <script src="../../core/panel-page.js"></script>
+    <script src="../../core/obs-link.js"></script>
+    <script src="../../core/holes.js"></script>
+    <script src="../../core/hud.js"></script>
+    <script>
+      /* BOOT -- after every core file (core/README.md). ?scene=GAME holds
+         one scene for review and never connects to OBS. */
+      startSheet();
+      const PAGE = mainPage("overlay");
+      if (!window.obsstudio) document.body.classList.add("preview");
+      applyPunch(-1); /* nothing live yet: the frame is covered */
+      const fixed = params.get("scene");
+      standalone = !!fixed;
+      if (fixed) goTo(String(SCENE_MAP[fixed.toUpperCase()] || 1), { instant: true });
+      else {
+        listenObsStudio();
+        seedFromObsStudio(0);
+        connect();
+      }
+      startHud();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,9 @@
+body { background: #3b4a9e !important; margin: 0; overflow: hidden; }
+yt-live-chat-header-renderer, #panel-pages, #show-more,
+yt-live-chat-banner-manager { display: none !important; }
+yt-live-chat-renderer, #chat, #contents, #item-list, #item-scroller, #items,
+yt-live-chat-item-list-renderer { background: transparent !important; }
+#item-scroller { overflow: hidden !important; }
+yt-live-chat-text-message-renderer { font-size: 20px !important; padding: 5px 10px !important; }
+yt-live-chat-text-message-renderer #author-name { color: #35d6e8 !important; font-weight: 700 !important; }
+yt-live-chat-text-message-renderer #message { color: #f4f1e8 !important; }
