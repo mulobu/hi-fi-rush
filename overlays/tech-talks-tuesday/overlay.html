@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Tech Talks Tuesday — Botanical Futures</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=VT323&display=swap" rel="stylesheet"><link rel="stylesheet" href="palette.css"><link rel="stylesheet" href="tech.css"></head>
+<body data-scene="start"><div class="viewport" id="viewport">
+<div class="shaker" id="shaker"><div class="page" id="page"></div></div>
+<div id="design">
+<svg class="surface" viewBox="0 0 1920 1080"><path id="surface-path" fill-rule="evenodd" d="M0 0H1920V1080H0Z"/></svg>
+<header class="header"><div class="brand"><svg viewBox="0 0 40 40"><path d="M20 20C-8-9 49-9 20 20C49 49-8 49 20 20C-9 49-9-8 20 20C49-8 49 49 20 20"/></svg><strong>tech talks<span>tuesday</span></strong></div><div class="header-line"></div><div id="socials"></div><div class="clock"><i></i><span id="clock">21:00 IST</span></div></header>
+<main class="hero"><div class="chapter"><span class="cross">+</span><span id="chapter">01 / THE CONVERSATION STARTS HERE</span></div><h1 id="hero-title">Starting<br><span>soon.</span></h1><p id="hero-desc">A little curiosity. A fresh perspective.<br>Let’s see what grows.</p><div class="standby"><div class="status"><span class="status-dot"></span><span id="status-text">GET COMFORTABLE</span></div><div class="timer-wrap"><span>WE BEGIN IN</span><strong id="timer">05:00</strong><svg viewBox="0 0 48 48"><path d="M8 24h30M27 13l11 11-11 11"/></svg></div></div></main>
+<div class="botanical-stage"><div class="specimen-disc"></div><div class="orbit orbit-one"></div><div class="orbit orbit-two"></div><div class="specimen-caption"><span>FIG. 01 — A GARDEN OF IDEAS</span><span>ASCII / IN MOTION</span></div><div class="coordinate coordinate-top">+</div><div class="coordinate coordinate-bottom">+</div><span class="vertical-note">NATURE, MEET THE NETWORK.</span></div>
+<div class="end-frame"><span>THE DEEP EFFECT</span><b>+</b></div><div class="game-notch"><span>THE DEEP EFFECT</span><b>+</b></div>
+<div class="chat-copy"><span class="eyebrow">OPEN THREAD / 06</span><h2>Good questions.<br><span>Better conversations.</span></h2><p>There’s room for your perspective.</p></div><div class="chat-divider"></div>
+<footer class="footer"><span class="footer-brand">THE DEEP EFFECT <b>↗</b></span><span class="footer-topic">TECHNOLOGY <i></i> CULTURE <i></i> WHAT’S NEXT</span><span class="footer-scene" id="scene-name">TECH TALKS TUESDAY</span><span class="footer-index">TT / 02</span></footer>
+</div><canvas id="screen"></canvas></div>
+<div id="countdown" hidden>05:00</div><div class="hud" id="hud" hidden><h4>TECH TALKS DEBUG</h4><div id="hudState"></div><div id="hudRects"></div><div id="hudLog"></div></div>
+<script src="../../core/contract.js"></script><script src="../../core/base.js"></script><script src="screen.js"></script><script src="ascii.js"></script><script src="flowers.js"></script>
+<script>const CANVAS_W=1920,CANVAS_H=1080;</script>
+<script src="fusion.js"></script>
+<script>
+/* The horizontal layout. Windows in canvas px; every cam window is 16:9
+   (docs/adr/0014), Chat is overlay.json's 624 x 936 (docs/adr/0015). */
+const WIN = {
+  gameCam: [0,756,576,324], chatCam: [0,72,1280,720],
+  chat: [1296,72,624,936], endCam: [64,336,768,432]
+};
+const PANELS = [panel(1,'start',[]),panel(2,'chat',[hole('Cam',WIN.chatCam),hole('Chat',WIN.chat)]),panel(3,'game',[hole('Game',FULL),hole('Cam',WIN.gameCam)]),panel(4,'cam',[hole('Cam',FULL)]),panel(5,'brb',[]),panel(6,'end',[hole('Cam',WIN.endCam)])];
+const HERO_GARDEN = makeGarden([
+  ['sun',{x:1490,ground:935,h:500,r:182,view:.85,face:-1,seed:5,leaves:[[.25,-1,.72],[.52,1,.67]]}],
+  ['tulip',{x:1265,ground:935,h:248,s:65,open:.65,lean:-.2,hue:.1,leaf:-1,leaves:2}],
+  ['tulip',{x:1340,ground:935,h:177,s:47,open:0,lean:.2,hue:.8,leaf:1}],
+  ['tulip',{x:1705,ground:935,h:285,s:72,open:.9,lean:.1,hue:.2,leaf:1,leaves:2}],
+  ['tulip',{x:1785,ground:935,h:193,s:50,open:.2,lean:-.3,hue:.6,leaf:-1}],
+]);
+const CHAT_GARDEN = makeGarden([
+  ['sun',{x:1120,ground:1000,h:143,r:49,view:.85,face:-1,seed:5,leaves:[[.4,-1,.7]]}],
+  ['tulip',{x:970,ground:1000,h:98,s:37,open:.8,lean:0,hue:.2,leaf:-1}],
+  ['tulip',{x:1024,ground:1000,h:68,s:28,open:0,lean:0,hue:.8,leaf:1}],
+]);
+const HERO = {garden:HERO_GARDEN,region:[130,13,233,80]};
+const GARDENS = {start:HERO,brb:HERO,end:HERO,chat:{garden:CHAT_GARDEN,region:[105,66,160,84]}};
+const GRID_TARGET = () => ({sourceName:OVERLAY_CONTRACT.host.main});
+</script>
+<script src="../../core/socials.js"></script><script src="../../core/panel-page.js"></script><script src="../../core/obs-link.js"></script><script src="../../core/holes.js"></script><script src="../../core/hud.js"></script>
+<script>
+startFusion();
+const PAGE=mainPage('overlay');
+const identified=PAGE.onIdentified;
+PAGE.onIdentified=function(){identified.call(PAGE);void GridFX.attach();};
+document.getElementById('socials').innerHTML=SOCIALS.map(s=>`<span><small>${s.on.map(n=>({kick:'KICK',twitch:'TWITCH',youtube:'YOUTUBE',instagram:'INSTAGRAM'}[n])).join(' / ')}</small>${s.handle}</span>`).join('');
+const fixed=params.get('scene')||params.get('preview');standalone=!!fixed;
+if(!window.obsstudio)document.body.classList.add('preview');applyPunch(-1);
+if(fixed)goTo(String(SCENE_MAP[fixed.toUpperCase()]||1));else{listenObsStudio();seedFromObsStudio(0);connect();}
+startHud();
+</script></body></html>

@@ -1,0 +1,24 @@
+/* Tech Talks Tuesday: chat on the night ground, in the overlay's type and
+   colours. obs-setup.py puts this on `Chat`. Same selectors as every
+   overlay's chat.css -- which do not yet reach the Restream embed
+   (money-talks-monday/CLAUDE.md, Status). */
+body {
+  margin: 0;
+  overflow: hidden;
+  background: #0d0e12 !important;
+}
+yt-live-chat-header-renderer, #panel-pages, #show-more,
+yt-live-chat-banner-manager { display: none !important; }
+yt-live-chat-renderer, #chat, #contents, #item-list, #item-scroller, #items,
+yt-live-chat-item-list-renderer { background: transparent !important; }
+#item-scroller { overflow: hidden !important; }
+yt-live-chat-text-message-renderer {
+  font-family: "IBM Plex Mono", Consolas, "Courier New", monospace !important;
+  font-size: 20px !important;
+  padding: 6px 12px !important;
+}
+yt-live-chat-text-message-renderer #author-name {
+  color: #ffc42e !important;
+  font-weight: 500 !important;
+}
+yt-live-chat-text-message-renderer #message { color: #e9e3d3 !important; }

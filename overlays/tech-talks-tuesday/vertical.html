@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Tech Talks Tuesday — Vertical</title>
+<!--
+  Tech Talks Tuesday on the vertical canvas: 1080 x 1920, driven by the MAIN
+  canvas's program scene, so one deck press moves both pages. Finding the
+  canvas, its scene and the platform safe zones is core/vertical.js; the
+  design, the transition and the garden are fusion.js, shared with
+  overlay.html. What is here is the portrait layout.
+
+  Face on top, as every vertical page has it. Every cam window is 16:9
+  (docs/adr/0014); Chat keeps overlay.json's 624:936 (docs/adr/0015). Type
+  stays inside SAFE_* (vertical.css says where); a flower region never
+  reaches a window, so no flower is drawn over video.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=VT323&display=swap" rel="stylesheet"><link rel="stylesheet" href="palette.css"><link rel="stylesheet" href="vertical.css"></head>
+<body data-scene="start"><div class="viewport" id="viewport">
+<div class="shaker" id="shaker"><div class="page" id="page"></div></div>
+<div id="design">
+<svg class="surface" viewBox="0 0 1080 1920"><path id="surface-path" fill-rule="evenodd" d="M0 0H1080V1920H0Z"/></svg>
+<header class="header"><div class="brand"><svg viewBox="0 0 40 40"><path d="M20 20C-8-9 49-9 20 20C49 49-8 49 20 20C-9 49-9-8 20 20C49-8 49 49 20 20"/></svg><strong>tech talks<span>tuesday</span></strong></div><div class="header-line"></div><div class="clock"><i></i><span id="clock">21:00 IST</span></div></header>
+<main class="hero"><div class="chapter"><span class="cross">+</span><span id="chapter">01 / THE CONVERSATION STARTS HERE</span></div><h1 id="hero-title">Starting<br><span>soon.</span></h1><p id="hero-desc">A little curiosity. A fresh perspective.<br>Let’s see what grows.</p><div class="standby"><div class="status"><span class="status-dot"></span><span id="status-text">GET COMFORTABLE</span></div><div class="timer-wrap"><span>WE BEGIN IN</span><strong id="timer">05:00</strong><svg viewBox="0 0 48 48"><path d="M8 24h30M27 13l11 11-11 11"/></svg></div></div></main>
+<div class="botanical-stage"><div class="specimen-disc"></div><div class="orbit orbit-one"></div><div class="orbit orbit-two"></div><div class="coordinate coordinate-top">+</div><div class="coordinate coordinate-bottom">+</div></div>
+<div class="end-frame"><span>THE DEEP EFFECT</span><b>+</b></div>
+<div class="game-notch"><span>04 / IN THE FLOW</span><span>THE DEEP EFFECT<b>+</b></span></div>
+<div class="cam-title"><div class="chapter"><span class="cross">+</span><span>05 / A CLOSER LOOK</span></div><h2>Tech talks<br><span>tuesday.</span></h2></div>
+<div class="chat-copy"><span class="eyebrow">OPEN THREAD / 06</span><h2>Good questions.<br><span>Better conversations.</span></h2><p>There’s room for your perspective.</p></div>
+<div class="side-note"><span class="sn-game">TECH TALKS TUESDAY</span><span class="sn-chat">ROOM FOR YOUR IDEAS</span></div>
+<footer class="footer"><div id="socials"></div><div class="footer-row"><span class="footer-brand">THE DEEP EFFECT <b>↗</b></span><span class="footer-scene" id="scene-name">TECH TALKS TUESDAY</span><span class="footer-index">TT / 02</span></div></footer>
+</div><canvas id="screen"></canvas></div>
+<div id="countdown" hidden>05:00</div><div class="hud" id="hud" hidden><h4>TECH TALKS VERTICAL DEBUG</h4><div id="hudState"></div><div id="hudRects"></div><div id="hudLog"></div></div>
+<script src="../../core/contract.js"></script><script src="../../core/base.js"></script><script src="../../core/vertical.js"></script><script src="screen.js"></script><script src="ascii.js"></script><script src="flowers.js"></script>
+<script>const CANVAS_W=1080,CANVAS_H=1920;</script>
+<script src="fusion.js"></script>
+<script>
+/* The portrait layout, in canvas px. GAME's stack (cam 432, notch 48, game
+   608) is centred between the bands, 212 to 1440. */
+const WIN = {
+  gameCam: [48,282,768,432], game: [0,762,1080,608],
+  chatCam: [48,236,768,432], chat: [448,700,468,702],
+  cam: [0,588,1080,608], endCam: [48,642,832,468]
+};
+const PANELS = [panel(1,'start',[]),panel(2,'chat',[hole('Cam',WIN.chatCam),hole('Chat',WIN.chat)]),panel(3,'game',[hole('Cam',WIN.gameCam),hole('Game',WIN.game)]),panel(4,'cam',[hole('Cam',WIN.cam)]),panel(5,'brb',[]),panel(6,'end',[hole('Cam',WIN.endCam)])];
+
+/* Every bed stands on y 1404, just over the footer. The tall sunflower
+   faces the words; a region stops short of every window. */
+const BED = 1404;
+const at = (items) => items.map(([k,o]) => [k,{ground:BED,...o}]);
+const V_HERO = makeGarden(at([
+  ...meadow(24,1060,BED+2,{gap:52,h:28,depth:.7,seed:21}),
+  ['sun',{x:812,h:610,r:160,view:.85,face:-1,seed:5,leaves:[[.3,-1,.82],[.55,1,.72]]}],
+  ['tulip',{x:690,h:232,s:58,open:.65,lean:-.2,hue:.1,leaf:-1,leaves:2}],
+  ['tulip',{x:748,h:158,s:42,open:0,lean:.2,hue:.8,leaf:1}],
+  ['tulip',{x:960,h:262,s:64,open:.9,lean:.1,hue:.2,leaf:1,leaves:2}],
+  ['tulip',{x:1030,h:172,s:44,open:.2,lean:-.3,hue:.6,leaf:-1}],
+  ['tulip',{x:118,h:196,s:50,open:.8,lean:.15,hue:.4,leaf:1,leaves:2}],
+  ['tulip',{x:176,h:128,s:36,open:.1,lean:-.1,hue:.9,leaf:-1}],
+  ['daisy',{x:262,h:70,s:15}],['daisy',{x:318,h:92,s:17}],['daisy',{x:404,h:58,s:13}],
+]));
+const V_END = makeGarden(at([
+  ...meadow(470,1060,BED+2,{gap:48,h:26,depth:.7,seed:23}),
+  ['sun',{x:884,h:200,r:76,view:.85,face:-1,seed:9,leaves:[[.4,-1,.72]]}],
+  ['tulip',{x:640,h:170,s:46,open:.7,lean:-.15,hue:.2,leaf:-1,leaves:2}],
+  ['tulip',{x:700,h:116,s:34,open:0,lean:.2,hue:.8,leaf:1}],
+  ['tulip',{x:1004,h:186,s:50,open:.85,lean:.1,hue:.5,leaf:1}],
+  ['daisy',{x:560,h:66,s:15}],['daisy',{x:772,h:84,s:16}],
+]));
+const V_CAM = makeGarden(at([
+  ...meadow(24,1060,BED+2,{gap:44,h:26,depth:.6,seed:31}),
+  ['tulip',{x:96,h:140,s:44,open:.8,lean:.1,hue:.3,leaf:1,leaves:2}],
+  ['tulip',{x:150,h:104,s:32,open:0,lean:-.2,hue:.9,leaf:-1}],
+  ['daisy',{x:236,h:64,s:15}],
+  ['tulip',{x:420,h:132,s:40,open:.6,lean:-.1,hue:.6,leaf:-1}],
+  ['daisy',{x:500,h:82,s:16}],
+  ['tulip',{x:640,h:144,s:46,open:.9,lean:.15,hue:.1,leaf:1,leaves:2}],
+  ['sun',{x:880,h:150,r:50,view:.85,face:-1,seed:5,leaves:[[.45,-1,.7]]}],
+  ['tulip',{x:990,h:120,s:36,open:.3,lean:-.2,hue:.7,leaf:-1}],
+]));
+const V_CHAT = makeGarden(at([
+  ...meadow(24,430,BED+2,{gap:46,h:26,depth:.6,seed:37}),
+  ['sun',{x:300,h:250,r:72,view:.85,face:-1,seed:5,leaves:[[.4,-1,.7]]}],
+  ['tulip',{x:116,h:170,s:46,open:.8,lean:.1,hue:.2,leaf:1,leaves:2}],
+  ['tulip',{x:176,h:112,s:32,open:0,lean:-.2,hue:.8,leaf:-1}],
+  ['daisy',{x:396,h:70,s:15}],
+]));
+const HERO = {garden:V_HERO,region:[0,50,135,119]};
+const GARDENS = {
+  start:HERO, brb:HERO,
+  end:{garden:V_END,region:[56,93,135,119]},
+  cam:{garden:V_CAM,region:[0,100,135,119]},
+  chat:{garden:V_CHAT,region:[0,84,55,119]},
+};
+/* The vertical host scene answers only by uuid (core/vertical.js), and
+   only once it has been found; GridFX waits for it. */
+const GRID_TARGET = () => vertSceneUuid ? {sourceUuid:vertSceneUuid} : null;
+</script>
+<script src="../../core/socials.js"></script><script src="../../core/panel-page.js"></script><script src="../../core/obs-link.js"></script><script src="../../core/holes.js"></script><script src="../../core/hud.js"></script>
+<script>
+/* BOOT. No obsstudio seed: on the vertical canvas the websocket is the
+   primary path (core/vertical.js). `?scene=` names the OBS scene there, so
+   a standalone preview is `?preview=GAME`. */
+startFusion();
+const PAGE=verticalPage('vertical');
+const identified=PAGE.onIdentified;
+PAGE.onIdentified=function(){identified.call(PAGE);void GridFX.attach();};
+document.getElementById('socials').innerHTML=SOCIALS.map(s=>`<span><small>${s.on.map(n=>SOCIAL_NAMES[n].toUpperCase()).join(' / ')}</small>${s.handle}</span>`).join('');
+const fixed=params.get('preview');standalone=!!fixed;
+if(!window.obsstudio)document.body.classList.add('preview');applyPunch(-1);
+if(fixed)goTo(String(SCENE_MAP[fixed.toUpperCase()]||1));else{listenObsStudio();connect();}
+startHud();
+</script></body></html>

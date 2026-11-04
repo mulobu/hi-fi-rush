@@ -1,0 +1,4 @@
+/* The page colours, for overlay.html and vertical.html alike. Phosphor
+   (docs/adr/0023); flowers.js THEMES holds the other palettes, whose `css`
+   fusion.js writes over these. */
+:root{--surface:#0b110d;--band:#08100b;--ink:#c9f7d6;--muted:#6f9a7c;--hair:rgba(74,222,128,.22);--accent:#4ade80;--ink-soft:#9cc7a8;--ink-topic:#7fb08d;--live:#4ade80;--disc-a:#12301e;--disc-b:#0b1a11;--disc-rim:rgba(74,222,128,.30);--orbit:rgba(74,222,128,.22);--hole-a:#0e1a12;--hole-b:#15261a;--hole-ink:#4ade80}

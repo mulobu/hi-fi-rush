@@ -1,0 +1,24 @@
+{
+  "_comment": [
+    "collection: the OBS scene collection this overlay lives in (docs/adr/0003).",
+    "  tools/obs-setup.py --overlay tech-talks-tuesday creates it.",
+    "chat: the Chat source's size, equal to the CHAT window in overlay.html,",
+    "  so the source fills it with nothing cropped (docs/adr/0015).",
+    "No mascot key: the sunflower is drawn by the page, not the mascot",
+    "  engine (docs/adr/0005).",
+    "transition: the 3D grid, an obs-shaderfilter filter on COMIC and on",
+    "  VCOMIC that the page switches on for each change (docs/adr/0025).",
+    "  filter must match FILTER in fusion.js. settings and vertical are",
+    "  written when setup creates it; vertical's 54 columns give the same",
+    "  20 px cells on 1080 as 96 on 1920."
+  ],
+  "name": "Tech Talks Tuesday",
+  "collection": "Tech Talks Tuesday",
+  "chat": { "width": 624, "height": 936 },
+  "transition": {
+    "filter": "Botanical Grid",
+    "shader": "grid-bend.shader",
+    "settings": { "Duration": 1.8 },
+    "vertical": { "Grid_Columns": 54 }
+  }
+}
