@@ -38,6 +38,7 @@ is — and why it changed.
 | [0031](0031-setup-runs-on-macos.md) | Setup runs on macOS: `Discord` only where OBS registers its kind, and a new collection's file is waited for | 2026-11-07 | Built; both faults found building the four overlays on the Mac |
 | [0032](0032-setup-names-the-plugins-it-cannot-install.md) | Setup names every plugin the overlay can use that OBS has not loaded, and installs none | 2026-11-07 | Built; reported against the live Tech Talks Tuesday collection |
 | [0032](0032-the-ecg-follows-the-rate-at-a-constant-paper-speed.md) | The ECG follows the heart rate, by spacing the beats, not by scrolling faster | 2026-11-07 | Built; driven on both pages at 58 and 150 bpm; revises 0028 |
+| [0033](0033-neon-nights-sunset-page-and-the-cruise.md) | Neon Nights: a sunset page cut by a CSS clip-path, and the cruise replaces the pan | 2026-11-19 | Built; both pages render all six scenes in the browser; not yet in OBS |
 
 Decisions taken before 2026-11-01 are in the table in `CLAUDE.md` §3, with
 their reasoning in §2. They are not back-filled here.

@@ -1,0 +1,1022 @@
+/* overlays/neon-nights/neon.css -- what every Neon Nights page draws alike: the
+   palette, the sunset, the chrome type, the neon signs and windows, the HUD
+   and the cruise. Each page keeps only its canvas size and where things sit.
+
+   Two layers per scene, and the split is load-bearing (docs/adr/0033):
+
+     .cut   everything that must never cross a window -- the sky, the sun,
+            the skyline, the floor, the scanlines. cruise.js sets its
+            clip-path to the canvas minus that scene's holes, evenodd, so a
+            punched window is simply outside the clip and the video shows
+            through. Animated art inside it is cut for free, which is the
+            whole reason it is a CSS clip and not an SVG mask.
+     .over  what is allowed over the video: window frames, their tabs, type,
+            the HUD. Never clipped.
+*/
+:root {
+  --night: #0d0320; /* the sky at the top, and type on magenta */
+  --deep: #1b0536;
+  --dusk: #3b0a53;
+  --magenta: #ff2d95; /* the hot pink: signs, rims, the sun's base */
+  --magenta-lo: #c81a7e;
+  --magenta-hi: #ff9ed2;
+  --cyan: #16e0ff; /* the other tube: windows, the grid, accents */
+  --cyan-lo: #0a7f9c;
+  --gold: #ffd93d; /* the sun's crown, lit windows, the money row */
+  --paper: #f4f2ff;
+  --line: rgba(236, 232, 255, 0.62);
+  --faint: rgba(236, 232, 255, 0.26);
+  --f-huge: Anton, "Arial Narrow", Impact, sans-serif;
+  --f-neon: Monoton, Anton, cursive;
+  --f-mono: "Share Tech Mono", "JetBrains Mono", Consolas, monospace;
+  /* The chrome: a sky-to-sunset ramp with a hard specular band at 51%. The
+     band is what makes it read as metal rather than as a gradient. */
+  --chrome: linear-gradient(
+    180deg,
+    #fffdf6 0%,
+    #ffeafb 24%,
+    #8ae9ff 43%,
+    #ffffff 50%,
+    #ffffff 53%,
+    #ff8ac4 64%,
+    #ff2d95 82%,
+    #8e1158 100%
+  );
+  --chrome-cy: linear-gradient(180deg, #ffffff 0%, #d8fbff 34%, #ffffff 50%, #16e0ff 66%, #0a7f9c 100%);
+}
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+body {
+  /* Transparent: a dead browser source shows what OBS has behind it, not a
+     white box. */
+  background: transparent;
+  overflow: hidden;
+  width: var(--canvas-w);
+  height: var(--canvas-h);
+  color: var(--paper);
+  font-family: var(--f-mono);
+  -webkit-font-smoothing: antialiased;
+}
+.viewport {
+  position: fixed;
+  inset: 0;
+  width: var(--canvas-w);
+  height: var(--canvas-h);
+  overflow: hidden;
+}
+
+/* ---- the page of panels: holes only, no paint. core/panel-page.js builds
+   it and core/holes.js tracks it; everything it would draw is off, because
+   this overlay paints its own scenes instead (core/README.md). ---------- */
+.shaker,
+.page {
+  position: absolute;
+  inset: 0;
+  transform-origin: 0 0;
+}
+.page {
+  width: 13000px;
+}
+.skirt-n,
+.skirt-s,
+.skirt-w,
+.skirt-e,
+.page-under,
+.under,
+.panel-tag {
+  display: none;
+}
+.panel {
+  position: absolute;
+  overflow: hidden;
+  border: 15px solid transparent;
+}
+.hole {
+  position: absolute;
+  overflow: hidden;
+  border: 0;
+}
+.fake-source {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background:
+    repeating-linear-gradient(135deg, rgba(255, 45, 149, 0.12) 0 14px, transparent 14px 28px),
+    linear-gradient(#1b0536, #0d0320);
+}
+.src-label {
+  font: 24px/1 var(--f-mono);
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+  color: rgba(22, 224, 255, 0.55);
+}
+.hole.punched .fake-source {
+  display: none;
+}
+/* In a browser, outside OBS, there is no video: keep the placeholders so the
+   composition can be judged. */
+body.preview .hole.punched .fake-source {
+  display: grid;
+}
+
+/* ---- the city: one layer of scenes, each a .cut and an .over ---------- */
+#city,
+#scenes,
+.scene,
+.scene > .cut,
+.scene > .over {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.scene {
+  display: none;
+}
+.scene.on,
+.scene.measure {
+  display: block;
+}
+.scene.measure:not(.on) {
+  visibility: hidden;
+}
+.scene > .cut {
+  /* cruise.js writes clip-path here, per scene. Until it does, nothing is
+     cut and the frame is solid -- which is the right way round: a page that
+     has not heard from OBS must not show video through a window it has not
+     been told is punched. */
+  overflow: hidden;
+}
+
+/* The sky. Four ramps, one per mood; a scene picks one by class. */
+.sky {
+  position: absolute;
+  inset: 0;
+}
+.sky-dusk {
+  background: linear-gradient(
+    180deg,
+    #0d0320 0%,
+    #2a0845 22%,
+    #6b1264 44%,
+    #c62a7c 62%,
+    #ff6a3d 78%,
+    #ffb03d 88%,
+    #2a0845 89%,
+    #14052c 100%
+  );
+}
+.sky-night {
+  background: linear-gradient(180deg, #06010f 0%, #140430 34%, #2d0a52 62%, #5b1066 82%, #94176e 100%);
+}
+.sky-noon {
+  background: linear-gradient(180deg, #1b0536 0%, #4a0f6b 30%, #9b1f78 55%, #ff5a8c 76%, #ffb03d 100%);
+}
+/* For a scene drawn as bands over the game: both bands sample the same
+   horizontal ramp, so the top and the bottom match. A full-canvas vertical
+   sky would give one band its dark end and the other its lit end. */
+.sky-bar {
+  background: linear-gradient(90deg, #0d0320, #2a0845 38%, #3b0a53 50%, #2a0845 62%, #0d0320);
+}
+.sky-deco {
+  background:
+    repeating-linear-gradient(90deg, rgba(255, 45, 149, 0.07) 0 3px, transparent 3px 26px),
+    linear-gradient(180deg, #14052c 0%, #2a0845 46%, #4a0f6b 72%, #7a1468 100%);
+}
+/* The horizon: the hard line the sun sits on and the floor runs from. */
+.horizon {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, var(--cyan) 12%, #fff 50%, var(--cyan) 88%, transparent);
+  box-shadow: 0 0 18px rgba(22, 224, 255, 0.85), 0 0 48px rgba(255, 45, 149, 0.5);
+}
+/* CRT texture, over the art and never over the video: it lives in .cut. */
+.scan {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(180deg, rgba(0, 0, 0, 0.26) 0 1px, transparent 1px 3px);
+  mix-blend-mode: multiply;
+}
+.vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 46%, transparent 42%, rgba(6, 1, 15, 0.62) 100%);
+}
+
+/* ---- art the builders return -------------------------------------- */
+.art {
+  position: absolute;
+  overflow: visible;
+}
+.v-palm.flip {
+  transform: scaleX(-1);
+}
+.v-palm-sway {
+  transform-origin: 50% 26%;
+  animation: sway 7s ease-in-out infinite;
+}
+@keyframes sway {
+  0%,
+  100% {
+    transform: rotate(-1.4deg) skewX(0.8deg);
+  }
+  50% {
+    transform: rotate(1.4deg) skewX(-0.8deg);
+  }
+}
+.v-sun {
+  filter: drop-shadow(0 0 40px rgba(255, 90, 140, 0.55));
+}
+.v-flicker {
+  animation: flick 5.5s steps(1) infinite;
+}
+@keyframes flick {
+  0%,
+  86%,
+  90%,
+  94%,
+  100% {
+    opacity: 0.8;
+  }
+  88%,
+  92% {
+    opacity: 0.18;
+  }
+}
+.v-stars .on {
+  fill: var(--gold);
+  filter: drop-shadow(0 0 7px rgba(255, 217, 61, 0.9));
+}
+.v-stars .off {
+  fill: none;
+  stroke: rgba(255, 217, 61, 0.45);
+  stroke-width: 2;
+}
+.v-stars .pulse {
+  animation: starpulse 1.6s ease-in-out infinite;
+}
+@keyframes starpulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+.v-tail {
+  animation: tail 2.4s ease-in-out infinite;
+  filter: drop-shadow(0 0 10px var(--magenta));
+}
+@keyframes tail {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+/* The car cruises: a long slow drift with a touch of suspension. */
+.v-car.drive {
+  animation: drive 9s linear infinite;
+}
+@keyframes drive {
+  from {
+    transform: translateX(-46%) translateY(0);
+  }
+  50% {
+    transform: translateX(0) translateY(-4px);
+  }
+  to {
+    transform: translateX(46%) translateY(0);
+  }
+}
+
+/* ---- the perspective floor ------------------------------------------ */
+.floor {
+  position: absolute;
+  left: 50%;
+  width: 420%;
+  transform: translateX(-50%);
+  overflow: hidden;
+  mask-image: linear-gradient(180deg, transparent 0%, #000 22%, #000 100%);
+}
+.fl-plane {
+  position: absolute;
+  inset: -2px;
+  transform-origin: 50% 0;
+  transform: perspective(430px) rotateX(74deg);
+  background-image:
+    repeating-linear-gradient(90deg, rgba(22, 224, 255, 0.5) 0 2px, transparent 2px 88px),
+    repeating-linear-gradient(0deg, rgba(255, 45, 149, 0.5) 0 2px, transparent 2px 88px);
+  animation: floorrun 1.8s linear infinite;
+}
+@keyframes floorrun {
+  to {
+    background-position:
+      0 0,
+      0 88px;
+  }
+}
+
+/* ---- the radar dial -------------------------------------------------- */
+.radar {
+  position: absolute;
+}
+.rd-face {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 42%, #1d0a42, #0a0320 78%);
+}
+.rd-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    repeating-linear-gradient(0deg, rgba(22, 224, 255, 0.26) 0 1px, transparent 1px 15px),
+    repeating-linear-gradient(90deg, rgba(22, 224, 255, 0.26) 0 1px, transparent 1px 15px);
+}
+.rd-sweep {
+  position: absolute;
+  inset: -30%;
+  background: conic-gradient(from 0deg, rgba(255, 45, 149, 0.6), rgba(255, 45, 149, 0.12) 46deg, transparent 90deg);
+  animation: spin 2.8s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.rd-ring {
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 4px solid rgba(236, 232, 255, 0.85);
+  box-shadow:
+    0 0 0 2px rgba(13, 3, 32, 0.9),
+    0 0 20px rgba(22, 224, 255, 0.5),
+    inset 0 0 14px rgba(255, 45, 149, 0.35);
+}
+.rd-me {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  margin: -9px 0 0 -7px;
+  border: 7px solid transparent;
+  border-bottom: 13px solid #fff;
+  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.9));
+}
+.rd-blip {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  margin: -4.5px 0 0 -4.5px;
+  border-radius: 50%;
+  background: var(--gold);
+  box-shadow: 0 0 10px var(--gold);
+  animation: blip 1.5s ease-in-out infinite;
+}
+.rd-blip.b2 {
+  background: var(--cyan);
+  box-shadow: 0 0 10px var(--cyan);
+  animation-delay: 0.7s;
+}
+@keyframes blip {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.25;
+    transform: scale(0.6);
+  }
+}
+
+/* ============================================================
+   TYPE
+   ============================================================ */
+/* HUGE: chrome, italic, each line fitted to its box at boot (fitAll). The
+   skew is on the block so the drop shadow leans with it. */
+.huge {
+  position: absolute;
+  font-family: var(--f-huge);
+  text-transform: uppercase;
+  line-height: 0.84;
+  letter-spacing: 0.004em;
+  transform: skewX(-9deg);
+  filter: drop-shadow(5px 7px 0 #2a0845) drop-shadow(0 0 22px rgba(255, 45, 149, 0.5));
+}
+.huge .ln {
+  display: block;
+  white-space: nowrap;
+}
+.huge .fit {
+  display: inline-block;
+  background: var(--chrome);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.huge em {
+  font-style: normal;
+  background: var(--chrome-cy);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+/* A line as an outline: the construction line under a headline. */
+.huge .o {
+  background: none;
+  color: transparent;
+  -webkit-text-stroke: 2.5px var(--magenta-hi);
+}
+
+/* A neon sign. Two tubes: the white core and the coloured bloom, which is
+   the same two passes the social icons are drawn with. */
+.neon {
+  position: absolute;
+  font-family: var(--f-neon);
+  color: #fff6fb;
+  letter-spacing: 0.02em;
+  text-shadow:
+    0 0 3px #fff,
+    0 0 10px var(--magenta),
+    0 0 26px var(--magenta),
+    0 0 54px var(--magenta-lo),
+    0 0 90px rgba(255, 45, 149, 0.5);
+}
+.neon.cy {
+  text-shadow:
+    0 0 3px #fff,
+    0 0 10px var(--cyan),
+    0 0 26px var(--cyan),
+    0 0 54px var(--cyan-lo),
+    0 0 90px rgba(22, 224, 255, 0.45);
+}
+.neon.buzz {
+  animation: buzz 6s steps(1) infinite;
+}
+@keyframes buzz {
+  0%,
+  70%,
+  74%,
+  80%,
+  100% {
+    opacity: 1;
+  }
+  72%,
+  78% {
+    opacity: 0.42;
+  }
+}
+
+/* The HUD money row: the stream's clock, set the way the dollars are. */
+.money {
+  position: absolute;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-family: var(--f-huge);
+  line-height: 1;
+  color: #fff;
+  text-shadow: 3px 4px 0 #2a0845;
+  transform: skewX(-9deg);
+}
+.money b {
+  font-weight: 400;
+  color: var(--gold);
+}
+.money small {
+  font: 15px/1 var(--f-mono);
+  letter-spacing: 0.26em;
+  color: var(--line);
+  transform: skewX(9deg);
+}
+
+/* A slate: the mono caption that labels everything on this page. */
+.slate {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font: 17px/1 var(--f-mono);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--line);
+  white-space: nowrap;
+}
+.slate.inline {
+  position: static;
+}
+.slate b {
+  color: var(--cyan);
+  font-weight: 400;
+  text-shadow: 0 0 12px rgba(22, 224, 255, 0.7);
+}
+.slate i {
+  width: 46px;
+  height: 1.5px;
+  background: var(--line);
+  flex: none;
+}
+.note {
+  position: absolute;
+  font: 16px/1.7 var(--f-mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--line);
+}
+.note b {
+  color: var(--gold);
+  font-weight: 400;
+}
+/* The countdown, in the money row's face. */
+.count {
+  position: absolute;
+  display: flex;
+  align-items: baseline;
+  gap: 18px;
+}
+.count small {
+  display: block;
+  font: 15px/1.5 var(--f-mono);
+  letter-spacing: 0.24em;
+  color: var(--line);
+}
+.count small b {
+  display: block;
+  color: var(--cyan);
+  font-weight: 400;
+}
+.count #countdown {
+  font-family: var(--f-huge);
+  font-size: 92px;
+  line-height: 0.9;
+  font-variant-numeric: tabular-nums;
+  transform: skewX(-9deg);
+  background: var(--chrome-cy);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(4px 5px 0 #2a0845);
+}
+
+/* A deco rule: the three-bar motif, thick to thin. */
+.rule {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.rule i {
+  display: block;
+  height: 4px;
+  background: linear-gradient(90deg, var(--magenta), var(--cyan));
+  box-shadow: 0 0 12px rgba(255, 45, 149, 0.6);
+}
+.rule i:nth-child(2) {
+  height: 2px;
+  opacity: 0.7;
+}
+.rule i:nth-child(3) {
+  height: 1px;
+  opacity: 0.45;
+}
+
+/* ---- a window: the chrome-and-neon frame round a hole ---------------- */
+.win {
+  position: absolute;
+  border: 3px solid var(--cyan);
+  box-shadow:
+    inset 0 0 0 1.5px rgba(255, 255, 255, 0.55),
+    0 0 0 7px rgba(13, 3, 32, 0.9),
+    0 0 20px rgba(22, 224, 255, 0.55),
+    0 0 52px rgba(255, 45, 149, 0.35);
+}
+.win.pink {
+  border-color: var(--magenta);
+  box-shadow:
+    inset 0 0 0 1.5px rgba(255, 255, 255, 0.5),
+    0 0 0 7px rgba(13, 3, 32, 0.9),
+    0 0 20px rgba(255, 45, 149, 0.6),
+    0 0 52px rgba(22, 224, 255, 0.3);
+}
+.win .c {
+  position: absolute;
+  width: 26px;
+  height: 26px;
+  border: 4px solid var(--magenta-hi);
+  filter: drop-shadow(0 0 7px var(--magenta));
+}
+.win .c.tl {
+  left: -13px;
+  top: -13px;
+  border-right: 0;
+  border-bottom: 0;
+}
+.win .c.tr {
+  right: -13px;
+  top: -13px;
+  border-left: 0;
+  border-bottom: 0;
+}
+.win .c.bl {
+  left: -13px;
+  bottom: -13px;
+  border-right: 0;
+  border-top: 0;
+}
+.win .c.br {
+  right: -13px;
+  bottom: -13px;
+  border-left: 0;
+  border-top: 0;
+}
+.win-tab {
+  position: absolute;
+  padding: 4px 14px 3px;
+  font: 15px/1 var(--f-mono);
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--night);
+  background: var(--cyan);
+  box-shadow: 0 0 16px rgba(22, 224, 255, 0.75);
+  white-space: nowrap;
+}
+.win.pink .win-tab {
+  background: var(--magenta);
+  color: #fff;
+  box-shadow: 0 0 16px rgba(255, 45, 149, 0.8);
+}
+.win.tab-tl .win-tab {
+  left: -3px;
+  top: -26px;
+}
+.win.tab-tr .win-tab {
+  right: -3px;
+  top: -26px;
+}
+.win.tab-bl .win-tab {
+  left: -3px;
+  bottom: -26px;
+}
+.win.tab-br .win-tab {
+  right: -3px;
+  bottom: -26px;
+}
+/* A marquee of bulbs along a window's top edge: the club sign. */
+.bulbs {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -3px;
+  height: 3px;
+  background: repeating-linear-gradient(90deg, var(--gold) 0 5px, transparent 5px 18px);
+  animation: chase 0.9s linear infinite;
+}
+@keyframes chase {
+  to {
+    background-position: 18px 0;
+  }
+}
+
+/* ---- the socials row ------------------------------------------------- */
+.soc {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 30px;
+}
+.soc.stack {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
+}
+.soc-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font: 21px/1 var(--f-mono);
+  letter-spacing: 0.1em;
+  color: var(--paper);
+  white-space: nowrap;
+}
+.soc-item img {
+  width: 27px;
+  height: 27px;
+  display: block;
+}
+.soc-item b {
+  font-weight: 400;
+  text-shadow: 0 0 14px rgba(22, 224, 255, 0.6);
+}
+
+/* ============================================================
+   THE CRUISE -- the transition (cruise.js, docs/adr/0033)
+   ============================================================ */
+#cruise {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 30;
+}
+/* The cover. overflow is VISIBLE on purpose: the streaks and the lit rule
+   run ahead of its top edge, and a clip here would eat exactly the part of
+   them that is meant to be seen. The art that must not escape the canvas
+   is clipped by .cr-body inside it instead. */
+.cr-sky {
+  position: absolute;
+  inset: 0;
+  will-change: transform;
+  transform: translateY(100%);
+  background: linear-gradient(
+    180deg,
+    #06010f 0%,
+    #1b0536 14%,
+    #4a0f6b 34%,
+    #9b1f78 52%,
+    #e6367f 68%,
+    #ff6a3d 80%,
+    #ffb03d 90%,
+    #1b0536 91%,
+    #0d0320 100%
+  );
+}
+/* The leading edge: a lit rule with streaks running ahead of it. Motion
+   lives here and not on the scene, so nothing the video shows through ever
+   moves out from under its frame. */
+.cr-edge {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -4px;
+  height: 7px;
+  background: linear-gradient(90deg, transparent, #fff 20%, var(--cyan) 50%, #fff 80%, transparent);
+  box-shadow: 0 0 26px rgba(22, 224, 255, 0.95), 0 -18px 60px rgba(255, 45, 149, 0.6);
+}
+.cr-streaks {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  height: 340px;
+  background: repeating-linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.5) 0 2px,
+    transparent 2px 34px
+  );
+  mask-image: linear-gradient(180deg, transparent, #000);
+  opacity: 0;
+}
+.cr-sky.rush .cr-streaks {
+  opacity: 0.85;
+  animation: streak 0.26s linear;
+}
+@keyframes streak {
+  from {
+    transform: scaleY(0.2);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+.cr-body {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+.cr-art {
+  position: absolute;
+  inset: 0;
+}
+.cr-scan {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(180deg, rgba(0, 0, 0, 0.3) 0 1px, transparent 1px 3px);
+  mix-blend-mode: multiply;
+}
+/* The last word's flash. A sunset ramp rather than flat gold: a full-frame
+   flat strobe for a quarter of a second is harder to watch than the beat is
+   worth, and the ramp reads as the sun coming up behind the word instead. */
+.cr-flash {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 44%, #ffe98a, #ffd93d 34%, #ff8a3d 72%, #ff2d95);
+  opacity: 0;
+}
+.cr-flash.on {
+  opacity: 1;
+}
+.cr-word,
+.cr-ghost {
+  position: absolute;
+  inset: 0;
+  transform-origin: 50% 50%;
+}
+#cruise text {
+  font-family: var(--f-huge);
+  text-anchor: middle;
+  text-transform: uppercase;
+}
+#cruise .word {
+  fill: url(#cr-chrome);
+  filter: drop-shadow(6px 8px 0 #2a0845);
+}
+#cruise[data-tone="flash"] .word {
+  fill: #2a0845;
+  filter: none;
+}
+#cruise .ghost {
+  fill: none;
+  stroke: var(--magenta-hi);
+  stroke-width: 3;
+}
+#cruise[data-tone="flash"] .ghost {
+  stroke: #2a0845;
+}
+/* The slate under the word: where and when, the way a cutscene labels it. */
+.cr-sub {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  font: 22px/1 var(--f-mono);
+  letter-spacing: 0.4em;
+  text-transform: uppercase;
+  color: #fff;
+  text-shadow: 0 0 18px rgba(22, 224, 255, 0.9);
+}
+.cr-sub i {
+  width: 70px;
+  height: 1.5px;
+  background: currentColor;
+}
+#cruise[data-tone="flash"] .cr-sub {
+  color: #2a0845;
+  text-shadow: none;
+}
+.cr-slate {
+  position: absolute;
+  font: 16px/1 var(--f-mono);
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--line);
+}
+#cruise[data-tone="flash"] .cr-slate {
+  color: rgba(42, 8, 69, 0.7);
+}
+.cr-slate.tl {
+  left: 48px;
+  top: 44px;
+}
+.cr-slate.tr {
+  right: 48px;
+  top: 44px;
+}
+.cr-slate.bl {
+  left: 48px;
+  bottom: 42px;
+}
+.cr-slate.br {
+  right: 48px;
+  bottom: 42px;
+}
+
+/* ---- the tape tear: the reveal's last 160 ms, over everything -------- */
+#tear {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 40;
+  opacity: 0;
+}
+#tear.on {
+  opacity: 1;
+}
+.tr-band {
+  position: absolute;
+  left: -6%;
+  width: 112%;
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(22, 224, 255, 0.35);
+  mix-blend-mode: screen;
+}
+#tear.on .tr-band {
+  animation: tearslide 0.16s steps(4) 1;
+}
+@keyframes tearslide {
+  0% {
+    transform: translateX(-3.5%);
+  }
+  50% {
+    transform: translateX(2.5%);
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+/* Static. feTurbulence rasterised once by the UA, so the grain costs one
+   decode and no per-frame work. */
+.tr-noise {
+  position: absolute;
+  inset: 0;
+  opacity: 0.26;
+  mix-blend-mode: screen;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.tr-rgb {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(255, 45, 149, 0.22), transparent 30%, transparent 70%, rgba(22, 224, 255, 0.22));
+  mix-blend-mode: screen;
+}
+
+/* ---- preview only: outside OBS, the area round the scaled canvas and the
+   scene buttons. Never drawn in OBS. ---------------------------------- */
+body.preview {
+  background: #07010e;
+}
+.preview-bar {
+  position: fixed;
+  left: 50%;
+  bottom: 10px;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+  background: rgba(7, 1, 14, 0.9);
+  border: 1px solid rgba(255, 45, 149, 0.55);
+  z-index: 70;
+}
+.preview-bar button {
+  font: 13px/1 var(--f-mono);
+  letter-spacing: 0.12em;
+  color: var(--cyan);
+  background: transparent;
+  border: 1px solid rgba(22, 224, 255, 0.35);
+  padding: 8px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.preview-bar button.on {
+  background: var(--magenta);
+  color: #fff;
+  border-color: var(--magenta);
+}
+
+/* ---- debug HUD, ?debug=1 only --------------------------------------- */
+.hud {
+  position: absolute;
+  right: 14px;
+  top: 14px;
+  max-width: 720px;
+  background: rgba(7, 1, 14, 0.93);
+  border: 2px solid var(--magenta);
+  padding: 11px 13px;
+  font: 12px/1.55 var(--f-mono);
+  color: var(--cyan);
+  z-index: 60;
+  pointer-events: none;
+  white-space: pre;
+}
+.hud h4 {
+  font-size: 15px;
+  letter-spacing: 0.14em;
+  margin-bottom: 6px;
+}
+.hud .off {
+  color: #4a4a55;
+}
+.hud .warn {
+  color: var(--gold);
+}
+.hud[hidden] {
+  display: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .v-palm-sway,
+  .rd-sweep,
+  .rd-blip,
+  .fl-plane,
+  .v-car.drive,
+  .v-tail,
+  .bulbs,
+  .neon.buzz,
+  .v-flicker,
+  .v-stars .pulse {
+    animation: none;
+  }
+}

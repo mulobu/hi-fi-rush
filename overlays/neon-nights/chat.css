@@ -1,0 +1,37 @@
+/* Neon Nights: chat as a neon club list. obs-setup.py puts this on `Chat`.
+   The left edge of the hole sits under the window's neon rule and its bulb
+   strip, so nothing starts in the first ~14px. Same selectors as every
+   overlay's chat.css -- which do not yet reach the Restream embed
+   (root CLAUDE.md, Status). */
+/* Bigger type for phones: the vertical page shows this source at about 1:1,
+   so the embed's own size is what a phone gets. Zoom scales the whole page
+   and needs none of its markup. It applies on both canvases. */
+html {
+  zoom: 1.4;
+}
+body {
+  margin: 0;
+  overflow: hidden;
+  background:
+    repeating-linear-gradient(180deg, rgba(255, 45, 149, 0.07) 0 1px, transparent 1px 3px),
+    linear-gradient(180deg, #14052c, #2a0845 60%, #3b0a53) !important;
+}
+yt-live-chat-header-renderer, #panel-pages, #show-more,
+yt-live-chat-banner-manager { display: none !important; }
+yt-live-chat-renderer, #chat, #contents, #item-list, #item-scroller, #items,
+yt-live-chat-item-list-renderer { background: transparent !important; }
+#item-scroller { overflow: hidden !important; }
+yt-live-chat-text-message-renderer {
+  font-family: "Share Tech Mono", Consolas, monospace !important;
+  font-size: 19px !important;
+  padding: 7px 14px 7px 18px !important;
+  border-bottom: 1px solid rgba(255, 45, 149, 0.22) !important;
+}
+yt-live-chat-text-message-renderer #author-name {
+  color: #16e0ff !important;
+  font-weight: 400 !important;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  text-shadow: 0 0 12px rgba(22, 224, 255, 0.7);
+}
+yt-live-chat-text-message-renderer #message { color: #f4f2ff !important; }

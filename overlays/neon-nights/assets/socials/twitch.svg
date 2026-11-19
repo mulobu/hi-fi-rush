@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <!-- Neon Nights: a neon tube. A magenta halo stroke under a cyan core, the
+       same two passes every sign on the page uses (neon.css .neon). -->
+  <g fill="none" stroke="#ff2d95" stroke-width="4.4" stroke-opacity=".45" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M5 3 3.5 7v12H8v3h3l3-3h4l3.5-3.5V3zM11 8v5M16 8v5"/>
+  </g>
+  <g fill="none" stroke="#16e0ff" stroke-width="1.9" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M5 3 3.5 7v12H8v3h3l3-3h4l3.5-3.5V3zM11 8v5M16 8v5"/>
+  </g>
+</svg>

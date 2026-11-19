@@ -1,0 +1,15 @@
+{
+  "_comment": [
+    "collection: the OBS scene collection this overlay lives in (docs/adr/0003).",
+    "  tools/obs-setup.py --overlay neon-nights creates it.",
+    "chat: the Chat source's size, equal to the CHAT window in overlay.html,",
+    "  so the source fills it with nothing cropped (docs/adr/0015). 440 is\n",
+    "  what the VERTICAL page can show: at 540 the last 80px of every chat\n",
+    "  line sits under the platform right rail.",
+    "No mascot key and no transition filter: the cruise is drawn by the page",
+    "  (cruise.js, docs/adr/0033). No heart key -- that is Fitness Friday's."
+  ],
+  "name": "Neon Nights",
+  "collection": "Neon Nights",
+  "chat": { "width": 440, "height": 930 }
+}

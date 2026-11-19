@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Neon Nights — OBS</title>
+    <!--
+      Neon Nights: 1984 Miami at sunset. The look is the reference and
+      nothing else: no game, studio or city name appears anywhere on screen
+      or in the art -- the words are the show's own. A slatted sun on
+      a neon grid, palms in silhouette, art deco towers, chrome italic type
+      and a HUD borrowed off the game. Each scene is one frame with its
+      windows cut out of it; the video shows through them. A switch is the
+      cruise (cruise.js, docs/adr/0033): the sunset rises over the frame,
+      the destination's name slams in as chrome a word at a time, the sky
+      leaves out of the top and the new scene lands under 170 ms of tape
+      tear.
+
+      Everything that talks to OBS is core/. This page is the layout: its
+      windows, which art goes where, and the words. art.js draws the sun,
+      the palms, the city, the car and the radar; cruise.js builds the page
+      and runs the cruise; neon.css is every style both pages share.
+      CLAUDE.md here has the design.
+    -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Anton&family=Monoton&family=Share+Tech+Mono&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="neon.css" />
+    <style>
+      :root {
+        --canvas-w: 1920px;
+        --canvas-h: 1080px;
+      }
+      /* GAME's two bands: the HUD sits on them, so they get the deco rule
+         along their inner edge and nothing else. */
+      .band-rule {
+        position: absolute;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: linear-gradient(90deg, transparent, var(--magenta) 15%, var(--cyan) 50%, var(--magenta) 85%, transparent);
+        box-shadow: 0 0 14px rgba(255, 45, 149, 0.7);
+      }
+      .g-title {
+        position: absolute;
+        display: flex;
+        align-items: baseline;
+        gap: 20px;
+        font-family: var(--f-huge);
+        font-size: 42px;
+        line-height: 1;
+        white-space: nowrap;
+        transform: skewX(-9deg);
+        color: #fff;
+        text-shadow: 3px 4px 0 #2a0845;
+      }
+      .g-title em {
+        font-style: normal;
+        color: var(--magenta-hi);
+      }
+      .g-title small {
+        font: 14px/1 var(--f-mono);
+        letter-spacing: 0.24em;
+        color: var(--line);
+        transform: skewX(9deg);
+      }
+    </style>
+  </head>
+  <body data-scene="">
+    <!-- The chrome ramp the cruise's words are filled with. A gradient on an
+         SVG text maps across the glyphs' own box, so the specular band lands
+         on the caps whatever the word's size. -->
+    <svg width="0" height="0" style="position: absolute" aria-hidden="true">
+      <defs>
+        <linearGradient id="cr-chrome" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#fffdf6" />
+          <stop offset=".24" stop-color="#ffeafb" />
+          <stop offset=".43" stop-color="#8ae9ff" />
+          <stop offset=".5" stop-color="#ffffff" />
+          <stop offset=".53" stop-color="#ffffff" />
+          <stop offset=".64" stop-color="#ff8ac4" />
+          <stop offset=".82" stop-color="#ff2d95" />
+          <stop offset="1" stop-color="#8e1158" />
+        </linearGradient>
+      </defs>
+    </svg>
+
+    <div class="viewport" id="viewport">
+      <div class="shaker" id="shaker"><div class="page" id="page"></div></div>
+      <div id="city"><div id="scenes"></div></div>
+      <div id="cruise" data-tone="chrome">
+        <div class="cr-sky">
+          <div class="cr-streaks"></div>
+          <div class="cr-edge"></div>
+          <div class="cr-body">
+            <div class="cr-art"></div>
+            <div class="cr-scan"></div>
+            <div class="cr-flash"></div>
+            <div class="cr-ghost"></div>
+            <div class="cr-word"></div>
+            <div class="cr-sub"><i></i><span>THE DEEP EFFECT</span><i></i></div>
+            <span class="cr-slate tl">THE DEEP EFFECT</span>
+            <span class="cr-slate tr cr-no">SCENE 00 / 06</span>
+            <span class="cr-slate bl">ON AIR</span>
+            <span class="cr-slate br">1984</span>
+          </div>
+        </div>
+      </div>
+      <div id="tear"></div>
+    </div>
+
+    <div class="hud" id="hud" hidden>
+      <h4>NEON NIGHTS DEBUG</h4>
+      <div id="hudState"></div>
+      <div id="hudRects"></div>
+      <div id="hudLog"></div>
+    </div>
+
+    <script src="../../core/contract.js"></script>
+    <script src="../../core/base.js"></script>
+    <script src="art.js"></script>
+    <script>
+      const CANVAS_W = 1920,
+        CANVAS_H = 1080;
+    </script>
+    <script src="cruise.js"></script>
+    <script>
+      /* ================================================================
+   WINDOWS -- in canvas px. Every cam window is 16:9, the iPhone's shape
+   (docs/adr/0014); Chat is overlay.json's 440 x 930, so its source fills
+   it uncropped (docs/adr/0015).
+   ================================================================ */
+      const WIN = {
+        startCam: [1096, 110, 760, 428],
+        chatCam: [48, 150, 1180, 664],
+        chat: [1400, 110, 440, 930],
+        gameCam: [40, 672, 512, 288],
+        cam: [40, 60, 1240, 698],
+        endCam: [1040, 548, 800, 450],
+      };
+      const PANELS = [
+        panel(1, "start", [hole("Cam", WIN.startCam)]),
+        panel(2, "chat", [hole("Cam", WIN.chatCam), hole("Chat", WIN.chat)]),
+        /* The game is the whole frame and the two bands cover its edges; the
+           cam window sits inside it, so cutPath drops its contained cut. */
+        panel(3, "game", [hole("Game", FULL), hole("Cam", WIN.gameCam)]),
+        panel(4, "cam", [hole("Cam", WIN.cam)]),
+        panel(5, "brb", []),
+        panel(6, "end", [hole("Cam", WIN.endCam)]),
+      ];
+
+      /* ================================================================
+   SCENES -- per scene: the cruise's words and slate, the sky, the art
+   under the windows (cut) and what may sit over the video (over). Both
+   run at boot, once SOCIALS exists.
+   ================================================================ */
+      const SCENES = {
+        start: {
+          words: ["THE DEEP", "EFFECT"],
+          sub: "STARTING SOON",
+          sky: "dusk",
+          cut: () =>
+            ART.stardust({ x: 0, y: 0, w: 1920, h: 460, n: 110, seed: 3 }) +
+            ART.sun({ x: 1476, y: 836, r: 248, id: "s1" }) +
+            ART.skyline({ x: -40, y: 742, w: 2000, h: 146, seed: 21 }) +
+            horizon(884) +
+            ART.floor({ y: 884, h: 196 }) +
+            ART.palm({ x: -210, y: 410, w: 440, h: 1100, seed: 11 }) +
+            ART.palm({ x: 1594, y: 500, w: 420, h: 1050, seed: 4, flip: true }),
+          over: () =>
+            slate("01", "OCEAN DRIVE · 1984", 48, 46) +
+            neon("THE DEEP EFFECT", { x: 50, y: 92, size: 52, cls: "buzz" }) +
+            huge(["STARTING", "<em>SOON</em>"], { x: 52, y: 230, w: 800 }) +
+            rule(56, 722, 420) +
+            `<div class="count" style="left:56px;top:760px"><small>DOORS OPEN IN<b>MM : SS</b></small><div id="countdown">05:00</div></div>` +
+            win(WIN.startCam, "CAM · LIVE") +
+            clockRow(1104, 588, 40) +
+            note("TONIGHT<br><b>ON STREAM</b>", 1104, 664) +
+            socialsRow("", "position:absolute;left:56px;top:992px"),
+        },
+
+        chat: {
+          words: ["LET'S", "TALK"],
+          sub: "LIVE CHAT",
+          sky: "deco",
+          cut: () =>
+            ART.burst({ x: -220, y: 560, w: 1560, h: 520 }) +
+            ART.skyline({ x: -40, y: 900, w: 1420, h: 118, seed: 58 }) +
+            horizon(1018) +
+            ART.floor({ y: 1018, h: 62 }) +
+            ART.palm({ x: -250, y: 330, w: 420, h: 1050, seed: 31 }),
+          over: () =>
+            slate("02", "LIVE CHAT", 48, 46) +
+            win(WIN.chatCam, "CAM · 16:9") +
+            win(WIN.chat, "CHAT", { tab: "tr", cls: "pink", bulbs: true }) +
+            neon("ON AIR", { x: 1402, y: 44, size: 42, cls: "cy buzz" }) +
+            huge(["LET'S <em>TALK</em>"], { x: 50, y: 854, w: 700 }) +
+            clockRow(824, 876, 36) +
+            socialsRow("", "position:absolute;left:56px;top:1002px"),
+        },
+
+        game: {
+          words: ["GAME", "ON"],
+          sub: "ON AIR",
+          sky: "bar",
+          /* The HUD's two bands. Everything else is the game. */
+          solid: [
+            [0, 0, 1920, 54],
+            [0, 1012, 1920, 68],
+          ],
+          cut: () => "",
+          over: () =>
+            `<i class="band-rule" style="top:52px"></i>` +
+            `<i class="band-rule" style="top:1012px"></i>` +
+            slate("03", "ON AIR", 48, 16) +
+            socialsRow("", "position:absolute;right:48px;top:12px") +
+            win(WIN.gameCam, "CAM", { tab: "tr", corners: ["tr", "br"], cls: "pink" }) +
+            `<div class="g-title" style="left:600px;top:1030px"><span>THE DEEP <em>EFFECT</em></span><small>ON AIR</small></div>` +
+            clockRow(1060, 1024, 34) +
+            ART.stars({ x: 1664, y: 806, size: 26, n: 5, lit: 2 }) +
+            ART.radar({ x: 1686, y: 846, size: 158 }),
+        },
+
+        cam: {
+          words: ["UP", "CLOSE"],
+          sub: "ON CAMERA",
+          sky: "noon",
+          cut: () =>
+            ART.sun({ x: 1612, y: 406, r: 206, id: "s4" }) +
+            ART.skyline({ x: 1240, y: 494, w: 760, h: 124, seed: 44 }) +
+            horizon(614) +
+            ART.floor({ y: 614, h: 466 }) +
+            ART.palm({ x: 1228, y: 420, w: 310, h: 775, seed: 17 }),
+          over: () =>
+            slate("04", "ON CAMERA", 48, 46) +
+            win(WIN.cam, "CAM · LIVE", { cls: "pink" }) +
+            huge(["THE DEEP <em>EFFECT</em>"], { x: 44, y: 796, w: 1180 }) +
+            note("HOST · STREAMING LIVE", 48, 1008) +
+            neon("LIVE", { x: 1332, y: 80, size: 76, cls: "cy buzz" }) +
+            rule(1332, 196, 300) +
+            clockRow(1332, 232, 40) +
+            socialsRow("stack", "position:absolute;left:1332px;top:792px"),
+        },
+
+        brb: {
+          words: ["BE RIGHT", "BACK"],
+          sub: "CRUISING OCEAN DRIVE",
+          sky: "night",
+          cut: () =>
+            ART.stardust({ x: 0, y: 0, w: 1920, h: 540, n: 140, seed: 9 }) +
+            ART.sun({ x: 960, y: 800, r: 330, id: "s5" }) +
+            ART.skyline({ x: -60, y: 674, w: 2040, h: 166, seed: 77 }) +
+            horizon(840) +
+            ART.floor({ y: 840, h: 240 }) +
+            ART.palm({ x: -170, y: -70, w: 470, h: 1175, seed: 23 }) +
+            ART.palm({ x: 1560, y: -220, w: 520, h: 1300, seed: 51, flip: true }) +
+            ART.car({ x: 660, y: 806, w: 600, h: 214, cls: "drive" }),
+          over: () =>
+            slate("05", "CRUISING OCEAN DRIVE", 48, 46) +
+            huge(["BE RIGHT", "<em>BACK</em>"], { x: 52, y: 150, w: 880 }) +
+            rule(56, 702, 520) +
+            note("BACK IN A MINUTE · KEEP THE RADIO ON", 56, 738) +
+            neon("THE DEEP EFFECT", { x: 1116, y: 168, size: 42, cls: "cy buzz" }) +
+            clockRow(1122, 258, 40) +
+            socialsRow("", "position:absolute;left:56px;top:992px"),
+        },
+
+        end: {
+          words: ["THAT'S A", "WRAP"],
+          sub: "SEE YOU NEXT TIME",
+          sky: "dusk",
+          cut: () =>
+            ART.stardust({ x: 0, y: 0, w: 1920, h: 420, n: 90, seed: 6 }) +
+            ART.burst({ x: -40, y: 60, w: 1140, h: 570 }) +
+            ART.sun({ x: 520, y: 906, r: 262, id: "s6" }) +
+            ART.skyline({ x: -40, y: 806, w: 2000, h: 118, seed: 33 }) +
+            horizon(920) +
+            ART.floor({ y: 920, h: 160 }) +
+            ART.palm({ x: 1690, y: 180, w: 360, h: 900, seed: 88, flip: true }),
+          over: () =>
+            slate("06", "THAT IS A WRAP", 48, 46) +
+            huge(["THAT'S A", "<em>WRAP</em>"], { x: 52, y: 142, w: 900 }) +
+            ART.stars({ x: 58, y: 694, size: 38, n: 5, lit: 5 }) +
+            note("SEE YOU NEXT STREAM", 58, 782) +
+            win(WIN.endCam, "CAM", { tab: "tl", cls: "pink" }) +
+            clockRow(1044, 490, 38) +
+            socialsRow("", "position:absolute;left:58px;top:992px"),
+        },
+      };
+    </script>
+    <script src="../../core/socials.js"></script>
+    <script src="../../core/panel-page.js"></script>
+    <script src="../../core/obs-link.js"></script>
+    <script src="../../core/holes.js"></script>
+    <script src="../../core/hud.js"></script>
+    <script>
+      /* BOOT -- after every core file (core/README.md). ?scene=GAME holds one
+         scene for review and never connects to OBS. */
+      startCity();
+      const PAGE = mainPage("overlay");
+      if (!window.obsstudio) document.body.classList.add("preview");
+      applyPunch(-1); /* nothing live yet: the frame is covered */
+      const fixed = params.get("scene");
+      standalone = !!fixed;
+      if (fixed) goTo(String(SCENE_MAP[fixed.toUpperCase()] || 1), { instant: true });
+      else {
+        listenObsStudio();
+        seedFromObsStudio(0);
+        connect();
+      }
+      startHud();
+    </script>
+  </body>
+</html>

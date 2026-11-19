@@ -14,7 +14,10 @@ its vertical page on VCOMIC (2026-11-04). The fourth,
 `overlays/fitness-friday/` (anatomy blueprints on a royal blue sheet), has
 both pages built and in OBS as its own collection (2026-11-05), not yet
 streamed; its live heart rate has both halves built, the watch app since
-2026-11-07, and has never run on the real watch.
+2026-11-07, and has never run on the real watch. The fifth,
+`overlays/neon-nights/` (a 1984 Miami sunset for the GTA VI stream), has
+both pages built and read back in the browser (2026-11-19); it is not in
+OBS yet.
 
 | Where | What |
 | --- | --- |
@@ -1175,6 +1178,7 @@ it is accepted and not kept, so every run "added" the Discord duck again.
 | Camera           | iPhone via iOS Camera Source; cam cutouts 16:9 (ADR 0014) | It is the only camera; any other hole shape crops it |
 | Chat source size | Per overlay, `overlay.json` `chat` (ADR 0015) | A browser source cropped to its hole loses text |
 | Shader transition | `overlay.json` `transition`, a filter setup asserts on COMIC and VCOMIC; recreated, never repointed; `--recompile` (ADR 0025) | obs-shaderfilter compiles only when a filter is created |
+| Scene art vs video | Per scene a `.cut` layer clipped `path(evenodd, canvas minus holes)`, and an unclipped `.over` (ADR 0033) | Animated art is cut at the windows for free; an SVG cut needs a path per element |
 
 ### Rejected, and why
 
@@ -1392,6 +1396,15 @@ Real ceiling is encoder sessions — mix NVENC and QuickSync/x264 across outputs
     never yet on the real watch. The chat styling, its profile and
     `shows.json` remain: its own build order,
     `overlays/fitness-friday/CLAUDE.md` §4 (ADR 0027, 0028, 0030)
+6t. ⬜ Neon Nights, the fifth overlay. A 1984 Miami sunset for the GTA
+    VI stream: a slatted sun on a neon grid, palms, art deco towers,
+    chrome italic type and an 80s crime-game HUD, with the cruise in
+    place of the pan. Both pages built 2026-11-19 and read back in the
+    browser — all six scenes on both canvases, every hole at its
+    authored rect. Nothing on screen names the game or any show. Its
+    OBS collection, the chat styling, its profile and `shows.json`
+    remain: its own build order,
+    `overlays/neon-nights/CLAUDE.md` §5 (ADR 0033)
 7. ⬜ Failsafes + panic key
 8. ⬜ Alert layer + queue, Streamer.bot / EventSub feed
 9. ⬜ Self-host fonts, go live
