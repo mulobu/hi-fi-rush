@@ -13,7 +13,8 @@ horizontal page built and in OBS as its own collection (2026-11-03), and
 its vertical page on VCOMIC (2026-11-04). The fourth,
 `overlays/fitness-friday/` (anatomy blueprints on a royal blue sheet), has
 both pages built and in OBS as its own collection (2026-11-05), not yet
-streamed; its live heart rate waits on a watch app still to be written.
+streamed; its live heart rate has both halves built, the watch app since
+2026-11-07, and has never run on the real watch.
 
 | Where | What |
 | --- | --- |
@@ -21,6 +22,7 @@ streamed; its live heart rate waits on a watch app still to be written.
 | `core/` | The page code every overlay shares, and `contract.js`, the names they all use. `core/README.md` is the page contract |
 | `tools/obs-setup.py` | Builds and checks the OBS side; the deck runs it for CLIP and GO LIVE |
 | `start.py`, `chat/`, `mascot/`, `heart/` | Bridges, chat TTS, the mascot page and its sprite sets (`mascot/sets/`), the live heart rate (ADR 0028) |
+| `watch/` | The Apple Watch app that feeds `heart/`. An Xcode project; the only part of the repo that is not Python, HTML or JS (ADR 0030) |
 | `assets/` | The workshop: LUTs and scratch, all gitignored. Nothing an overlay loads lives here |
 | `docs/adr/` | **Decision records.** Every decision from 2026-11-01 on, one dated file each |
 
@@ -837,14 +839,38 @@ goes missing is worse than no filter, because it looks like one.
 
 **Live heart rate: a third bridge, for overlays that ask** (ADR 0028).
 `heart/heart-bridge.py`, port 4462, takes `POST /hr {"bpm": 72}` from our
-own Apple Watch app (not written yet; it is to be built on a Mac) and serves
-`/events` to the pages, as the chat bridge does for `tts.html`. watchOS
-allows plain HTTP but not WebSockets (Apple TN3135), so the watch posts. It
-binds every interface, because the watch is another device, so its first
-run asks for a firewall exception (Private). `start.py` runs it only for an
-overlay whose `overlay.json` says `"heart": true`. Pages show the number
-only while a reading is under 15 s old: before the first reading they show
-the design's value, and after a lost feed `--`.
+own Apple Watch app in `watch/` and serves `/events` to the pages, as the
+chat bridge does for `tts.html`. watchOS allows plain HTTP but not
+WebSockets (Apple TN3135), so the watch posts. It binds every interface,
+because the watch is another device, so its first run asks for a firewall
+exception (Private). `start.py` runs it only for an overlay whose
+`overlay.json` says `"heart": true`. Pages show the number only while a
+reading is under 15 s old: before the first reading they show the design's
+value, and after a lost feed `--`. The drawn ECG follows the rate too
+(ADR 0032): the scroll keeps one constant paper speed, as a real trace
+does, and the live rate changes how far apart the beats are drawn inside
+it — the complex itself is laid out in milliseconds, because a QRS is
+90 ms whatever the heart is doing.
+
+**The watch app is `watch/`, a standalone watchOS app** (ADR 0030): an
+`HKWorkoutSession` with an `HKLiveWorkoutBuilder`, because nothing else on
+watchOS keeps the sensor on and the app alive with the wrist down, and a
+`URLSession` post per sample. The workout is **discarded**, never saved —
+this is a readout, not a training log. **A reading that cannot be sent now
+is dropped, not queued:** one request in flight, a 4 s timeout under the
+~5 s between samples, no retry. The page judges a reading stale by when it
+arrived, so a late one would be believed as current, which is worse than a
+gap. Its one setting is the PC's address, and its check is a `GET /status`,
+never a post, because a test reading would show on stream as live for 15 s.
+
+**The watch simulator feeds it real samples**, one every 5.000 s, so the
+whole chain runs on a Mac with no watch and no PC: workout sample → post
+→ bridge → SSE → the page `live`, Stop → the page `lost`. Measured
+2026-11-07 on Xcode 26.4 / watchOS 26.4, along with HealthKit's 0.4–2.2 s
+delay in handing a sample over, and that `NSAllowsLocalNetworking` alone
+lets a plain-HTTP post reach a LAN IP literal. **What the simulator cannot
+say is the one thing ADR 0028 flagged**: whether the watch reaches the PC
+without the iPhone, since the simulator shares the Mac's network stack.
 
 **`start.py` is the one command.** Both bridges, then OBS if it is not open.
 Each bridge's output is prefixed with its name; one that crashes after running
@@ -1144,6 +1170,8 @@ it is accepted and not kept, so every run "added" the Discord duck again.
 | TTS blocklist    | Gitignored, required to start          | Personal and a list of slurs; a missing filter must be loud |
 | Launching        | `start.py` — bridges, then OBS         | One command; a job object so no bridge orphans |
 | Heart rate       | Our own Apple Watch app → HTTP POST → `heart/heart-bridge.py` → SSE to the pages (ADR 0028) | No service or token; watchOS allows HTTP, not WebSockets; the page draws its own heart |
+| Watch app        | Standalone watchOS app in `watch/`; workout discarded; a reading dropped, never queued (ADR 0030) | A companion is an addition, not a rewrite; a late reading is believed as current, so a gap is the honest answer |
+| ECG trace        | Constant paper speed; the rate spaces the beats; the complex is drawn in ms (ADR 0032) | Retiming a running animation jumps; a QRS does not stretch with the rate |
 | Camera           | iPhone via iOS Camera Source; cam cutouts 16:9 (ADR 0014) | It is the only camera; any other hole shape crops it |
 | Chat source size | Per overlay, `overlay.json` `chat` (ADR 0015) | A browser source cropped to its hole loses text |
 | Shader transition | `overlay.json` `transition`, a filter setup asserts on COMIC and VCOMIC; recreated, never repointed; `--recompile` (ADR 0025) | obs-shaderfilter compiles only when a filter is created |
@@ -1262,6 +1290,8 @@ Failure modes and guards:
 | Blocklist missing on a fresh clone | Chat read aloud unfiltered | Bridge refuses to start; `start.py` and `--check` both name the file |
 | Launcher killed hard | Bridges orphaned, ports held, next start says "already running" | Windows job object with `KILL_ON_JOB_CLOSE` |
 | OBS closed while the bridge runs | Lines synthesised for nobody pile up | No page connected = line dropped, never queued |
+| Watch posts while the bridge is down or the PC has moved | A reading lost for each failed post | Dropped, never queued: a late reading would be believed as current. The watch screen names the fault, the page goes `lost` |
+| Watch app opened but never started | No readings; the page shows the design's 72 forever | `Go Live` is one press, and the screen reads `sensor off` until it |
 | Two profiles on one stream key | Switching profile changes nothing — same Restream setup | `do_profiles` compares key hashes across every profile |
 | A duplicated profile left connected to Restream | It streams on `Default RTMP` whatever key it holds | Warned when more than one profile is connected |
 | Profile made with Profile → New | 720p output, 30 fps, x264, no delay, OBS's default bitrate | Every profile is visited and warned; encoder settings compared with the active one |
@@ -1356,10 +1386,12 @@ Real ceiling is encoder sessions — mix NVENC and QuickSync/x264 across outputs
     (body, brain, heart, lungs, hand), and a word sting in place of the
     pan. Both pages built; in OBS as its own collection 2026-11-05, all
     twelve punch sets read back, 0 of 758 frames skipped, its mic copied
-    from Money Talks Monday. The live heart rate's PC side is built
-    (`heart/`, ADR 0028); the Apple Watch app is next, on the MacBook.
-    The chat styling, its profile and `shows.json` remain: its own build
-    order, `overlays/fitness-friday/CLAUDE.md` §4 (ADR 0027, 0028)
+    from Money Talks Monday. The live heart rate is built end to end —
+    the bridge (`heart/`, ADR 0028) and the watch app (`watch/`, ADR
+    0030), the whole chain driven on the watchOS simulator 2026-11-07 and
+    never yet on the real watch. The chat styling, its profile and
+    `shows.json` remain: its own build order,
+    `overlays/fitness-friday/CLAUDE.md` §4 (ADR 0027, 0028, 0030)
 7. ⬜ Failsafes + panic key
 8. ⬜ Alert layer + queue, Streamer.bot / EventSub feed
 9. ⬜ Self-host fonts, go live
@@ -1493,6 +1525,15 @@ Real ceiling is encoder sessions — mix NVENC and QuickSync/x264 across outputs
   on: press once on a scene switch, then check that row's `vod` lands on the
   switch in the Restream recording. If it is 120 s late, the delay is already
   counted and `vod` should be `stream` alone.
+- **The watch app has never run on a watch.** Everything about it was
+  measured on the watchOS 26.4 simulator, which shares the Mac's network
+  stack — so the one question ADR 0028 raised is still open: **whether the
+  watch reaches the PC on its own**, off the iPhone. If it cannot, the
+  fallback is an iPhone app relaying over WatchConnectivity to the same
+  `POST /hr`, and the PC side does not change. Also unseen: whether
+  readings keep arriving with the wrist down across a whole stream, what
+  four hours of it costs the battery, and whether watchOS asks a
+  local-network permission the way iOS 14 does.
 - **Left over from the move to one repo (2026-11-01).**
   - The GitHub repo is still named `hi-fi-rush`.
   - **`shows.json`**, day → overlay + profile, waits for the schedule.

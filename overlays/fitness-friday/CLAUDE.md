@@ -25,13 +25,19 @@ Not yet streamed.
 - **Not seen with live video:** no game was running and the iPhone camera
   was not sending, so every window rendered black.
 
-**Live heart rate** ([ADR 0028](../../docs/adr/0028-heart-rate-from-our-own-watch-app.md)):
+**Live heart rate** ([ADR 0028](../../docs/adr/0028-heart-rate-from-our-own-watch-app.md),
+[0030](../../docs/adr/0030-the-watch-app-is-standalone-and-drops-rather-than-queues.md)):
 
 - **Built:** the PC side, `heart/heart-bridge.py` and `HEART` in `sheet.js`.
   It was tested in OBS with the bridge's `--fake` feed: GAME showed 64 BPM
   with the beating dot.
-- **Not built:** the Apple Watch app. It is to be made on the user's
-  MacBook, against the contract in ADR 0028.
+- **Built:** the Apple Watch app, `watch/` (2026-11-07). The whole chain
+  was driven on the watchOS simulator, which feeds real HealthKit samples
+  during a workout session: GAME went live at 61 BPM off the watch, and
+  `lost` 15 s after Stop.
+- **Never run on the real watch.** Whether it reaches the PC without the
+  iPhone is the open question; the simulator shares the Mac's network
+  stack and cannot answer it.
 
 **How the collection was built.**
 
@@ -145,8 +151,15 @@ one of three states on `body[data-hr]`:
 | `live` | The last reading is under 15 s old | The number, a dot beating beside BPM, and both hearts beating at that rate (`--beat`) |
 | `lost` | There were readings, and none for 15 s | `--`, dimmed. A number that is not live never shows |
 
-- **The ECG keeps its drawn speed.** A real trace scrolls at a constant
-  paper speed, and changing a running animation's duration makes it jump.
+- **The ECG follows the rate by spacing its beats**, not by scrolling
+  faster ([ADR 0032](../../docs/adr/0032-the-ecg-follows-the-rate-at-a-constant-paper-speed.md)).
+  Paper speed is constant on a real trace, and retiming a running
+  animation makes it jump — so the scroll is written once and never
+  touched, and `ECG.tune` only rewrites how many beats the loop holds.
+  The complex itself is drawn in seconds (P 90 ms, QRS 90 ms, QT by
+  Bazett), because a QRS is 90 ms at 50 bpm and at 160; diastole is the
+  only part the rate moves. Beats per loop must be whole, so the drawn
+  rate is within 3.2% between 60 and 180 bpm.
 - **When the bridge is down**, the page retries after 3 s, doubling to once
   a minute, so a day without it costs one log line a minute, not one every
   3 s.
@@ -247,7 +260,11 @@ One step at a time, each checked before the next:
    - ⬜ The profile.
    - ⬜ `shows.json`.
    - ⬜ Export `scenes.json`.
-6. ⬜ The Apple Watch app, on the MacBook (ADR 0028).
+6. 🟨 The Apple Watch app, `watch/` (ADR 0028, 0030).
+   - ✅ Built on the MacBook and driven end to end on the watchOS
+     simulator (2026-11-07).
+   - ⬜ Run on the real watch: does it reach the PC without the iPhone,
+     does it hold up with the wrist down, what does it cost the battery.
 
 ## 5. Open
 

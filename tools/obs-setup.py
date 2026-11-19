@@ -834,6 +834,15 @@ def obs_config_dir() -> Path:
     return Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "obs-studio"
 
 
+def plugin_dir_hint() -> str:
+    """Where this OS looks for OBS plugins, for a warning that names one."""
+    if sys.platform == "darwin":
+        return "~/Library/Application Support/obs-studio/plugins"
+    if sys.platform.startswith("win"):
+        return "%ProgramData%\\obs-studio\\plugins"
+    return "~/.config/obs-studio/plugins"
+
+
 def discover_password() -> str:
     """Read the password OBS generated for itself on this machine.
 
@@ -897,6 +906,26 @@ def collection_path(name: str = "") -> Path:
             % (len(files), d, ", ".join(sorted({display(f) for f in files})))
         )
     return files[0]
+
+
+def wait_for_collection_file(name: str, timeout: float = 5.0) -> Path:
+    """The collection's file, once OBS has actually written it.
+
+    A collection created over the websocket lives in memory first: OBS writes
+    it when it next saves, which switching away forces -- and the write lands a
+    moment *after* the switch request has answered. So this polls rather than
+    assuming, and raises collection_path's own error if the file never appears.
+    Measured on macOS 2026-11-07: a build straight after CreateSceneCollection
+    found no file and exited before it had built anything.
+    """
+    deadline = time.monotonic() + timeout
+    while True:
+        try:
+            return collection_path(name)
+        except SystemExit:
+            if time.monotonic() >= deadline:
+                raise
+            time.sleep(0.25)
 
 
 def scrub_url(url: str) -> str:
@@ -1373,6 +1402,7 @@ def main() -> None:
     mic_copy = do_mic_copy(obs, plan, a, want_coll)
 
     preflight(plan)
+    do_plugins(obs, plan, a)
 
     # --- scenes ------------------------------------------------------------
     scenes = {s["sceneName"] for s in obs.req("GetSceneList")["scenes"]}
@@ -2084,6 +2114,83 @@ def create_browser(obs, kind: str, settings: dict) -> None:
     obs.req("SetSceneItemEnabled", dict(item, sceneItemEnabled=True))
 
 
+# ---------------------------------------------------------------------------
+# plugins
+#
+# OBS loads a plugin as a binary at process start, and no websocket request
+# installs one -- so these sit beside Desktop Audio and Browser Source Hardware
+# Acceleration as steps this script can only name (docs/adr/0032). Named in one
+# block, early, because the alternative is learning them one at a time: that
+# the vertical canvas needs a plugin only on the day you pass --vertical, and
+# that the transition needs one only once a switch cuts instead of bending.
+
+PLUGIN_URLS = {
+    "obs-shaderfilter":
+        "https://obsproject.com/forum/resources/obs-shaderfilter.1736/",
+    "a vertical canvas plugin":
+        "https://vertical-plugin.restream.io/ (Restream's build -- the only "
+        "one with a websocket vendor, which --go-live needs), or "
+        "https://aitum.tv/vertical",
+    "iOS Camera Source":
+        "https://obsproject.com/forum/resources/ios-camera-source.1066/",
+    "NVIDIA Audio Effects SDK":
+        "https://www.nvidia.com/en-us/geforce/broadcasting/broadcast-sdk/resources/",
+}
+
+
+def do_plugins(obs, plan: Plan, a) -> None:
+    """Name the plugins this overlay can use that OBS has not loaded.
+
+    Reports only. Each entry says whether the overlay needs it now or can do
+    without, because a missing one is often a deliberate choice -- no iPhone on
+    this machine, no RTX card -- and a warning that cannot tell the difference
+    is one you learn to skip.
+    """
+    filters = set(obs.req("GetSourceFilterKindList")["sourceFilterKinds"])
+    inputs = set(obs.req("GetInputKindList")["inputKinds"])
+    missing = []                     # (name, needed now, what it costs)
+
+    cfg = transition_cfg()
+    if cfg and TRANSITION_KIND not in filters:
+        missing.append((
+            "obs-shaderfilter", True,
+            "%s, this overlay's own transition (overlay.json). Without it "
+            "every scene change is a plain cut" % (cfg.get("filter") or "a shader")))
+
+    if vertical_canvas(obs) is None:
+        missing.append((
+            "a vertical canvas plugin", bool(a.vertical),
+            "the %dx%d second canvas %s lives on, for streaming 9:16 beside "
+            "the main output. Installed already? Then add a canvas in its dock"
+            % (VERT_W, VERT_H, VERT_SCENE)))
+
+    if CAM_KIND not in inputs:
+        missing.append((
+            "iOS Camera Source", False,
+            "the iPhone as %s (docs/adr/0014). Without it %s is an ordinary "
+            "capture device, which is a choice on a machine with another "
+            "camera, not a fault" % (SRC["cam"], SRC["cam"])))
+
+    if a.denoise and NV_DENOISE_KIND not in filters:
+        missing.append((
+            "NVIDIA Audio Effects SDK", False,
+            "%s on the mic -- an RTX card and a Windows install. %s (RNNoise) "
+            "is the fallback setup uses instead"
+            % (NV_DENOISE_FILTER, DENOISE_FILTER)))
+
+    if not missing:
+        return
+    lines = "\n".join(
+        "      %s%s -- %s\n        %s"
+        % (name, "" if needed else " (optional)", why, PLUGIN_URLS[name])
+        for name, needed, why in missing)
+    plan.warn(
+        "%d plugin%s this overlay can use that OBS has not loaded. Nothing "
+        "here is installable over the websocket, and libobs binds a plugin at "
+        "launch, so: install, then restart OBS. They live under %s.\n%s"
+        % (len(missing), "" if len(missing) == 1 else "s", plugin_dir_hint(), lines))
+
+
 def do_audio(obs, plan: Plan) -> None:
     """One capture per application, and none of a whole output device.
 
@@ -2138,14 +2245,28 @@ def do_audio(obs, plan: Plan) -> None:
                       "twice until %s is gone"
                       % (DISCORD_SOURCE, whole[0], whole[0]))
     elif per_app:
-        plan.do(
-            "create input %s (%s, Discord.exe)" % (DISCORD_SOURCE, DISCORD_KIND),
-            lambda: obs.req("CreateInput", {
-                "sceneName": HOST_SCENE, "inputName": DISCORD_SOURCE,
-                "inputKind": DISCORD_KIND,
-                "inputSettings": dict(DISCORD_SETTINGS),
-                "sceneItemEnabled": True}),
-        )
+        # Process loopback is Windows-only: macOS registers no
+        # wasapi_process_output_capture, and CreateInput with a kind this OBS
+        # does not have raises -- which aborted the whole run here, before the
+        # mic chain, CAM OFF, the transition and Cut had been asserted. Asked
+        # of OBS rather than of sys.platform: a kind the binary did not
+        # register is missing whatever the OS says.
+        if DISCORD_KIND not in set(obs.req("GetInputKindList")["inputKinds"]):
+            plan.warn(
+                "this OBS has no %s, so there is no %s source and friends' "
+                "voices never reach the stream. Process loopback is a Windows "
+                "capture; on macOS the only paths are a virtual device such as "
+                "BlackHole or a capture of the whole output, which is what %s "
+                "exists to avoid." % (DISCORD_KIND, DISCORD_SOURCE, DISCORD_SOURCE))
+        else:
+            plan.do(
+                "create input %s (%s, Discord.exe)" % (DISCORD_SOURCE, DISCORD_KIND),
+                lambda: obs.req("CreateInput", {
+                    "sceneName": HOST_SCENE, "inputName": DISCORD_SOURCE,
+                    "inputKind": DISCORD_KIND,
+                    "inputSettings": dict(DISCORD_SETTINGS),
+                    "sceneItemEnabled": True}),
+            )
 
 
 
@@ -2279,9 +2400,12 @@ def do_mic_copy(obs, plan: Plan, a, target: str) -> bool:
     mic = donors[donor][1]
 
     def apply() -> None:
-        dest = collection_path(target)
+        # Switch first, then look for the file. Switching away is what makes
+        # OBS write the target out, so resolving it beforehand raced the save
+        # and lost on a collection created moments earlier.
         obs.req("SetCurrentSceneCollection", {"sceneCollectionName": donor})
         try:
+            dest = wait_for_collection_file(target)
             doc = json.loads(dest.read_text(encoding="utf-8"))
             if any(doc.get(k) for k in MIC_SLOTS):
                 return               # it gained one meanwhile; leave it be
@@ -2904,9 +3028,8 @@ def do_transition_filter(obs, plan: Plan, a, where: dict, label: str,
     kinds = obs.req("GetSourceFilterKindList")["sourceFilterKinds"]
     if TRANSITION_KIND not in kinds:
         plan.warn(
-            "OBS has no %s filter, so %s gets no %s and the page cuts. Install "
-            "obs-shaderfilter under %%ProgramData%%\\obs-studio\\plugins and "
-            "restart OBS -- plugins load at launch" % (TRANSITION_KIND, label, name))
+            "OBS has no %s filter, so %s gets no %s and the page cuts -- see "
+            "the plugin note above" % (TRANSITION_KIND, label, name))
         return
     try:
         filters = obs.req("GetSourceFilterList", where)["filters"]

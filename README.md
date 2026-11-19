@@ -62,6 +62,14 @@ needed only to build a *new* sprite sheet, never to run the overlay.
 **OBS 32+ if you want the vertical output**, plus the Aitum Vertical Canvas
 plugin — step 9. 31 is enough for everything else.
 
+**Plugins are named by the script, never installed by it.** Every run lists
+the plugins this overlay can use that OBS has not loaded — obs-shaderfilter
+for a transition, a vertical canvas plugin, iOS Camera Source — with what you
+lose without each and where to get it
+([ADR 0032](docs/adr/0032-setup-names-the-plugins-it-cannot-install.md)). No
+websocket request installs a plugin, and libobs binds them at launch, so each
+one is: install, restart OBS, re-run.
+
 On Windows substitute `py -3` for `python3` in everything below. `python3` is
 not a command there: Windows ships a `py` launcher instead, and the bare names
 `python` / `python3` hit a Microsoft Store stub that installs nothing and exits

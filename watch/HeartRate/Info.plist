@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleDisplayName</key>
+	<string>Heart Rate</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleVersion</key>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+
+	<!-- A watch app with no iPhone app beside it. -->
+	<key>WKApplication</key>
+	<true/>
+	<key>WKWatchOnly</key>
+	<true/>
+
+	<!-- Without this the app is suspended the moment the wrist drops, and
+	     the readings stop with it. It is what an HKWorkoutSession needs to
+	     keep running (ADR 0028). -->
+	<key>WKBackgroundModes</key>
+	<array>
+		<string>workout-processing</string>
+	</array>
+
+	<key>NSHealthShareUsageDescription</key>
+	<string>Reads your heart rate while you stream, so the overlay can show it.</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>Starts a workout session to keep the heart-rate sensor on. The workout is discarded, never saved.</string>
+
+	<!-- The bridge is plain HTTP on the local network: there is no
+	     certificate to have on a PC on your own LAN, and the data never
+	     leaves the house (ADR 0028). NSAllowsLocalNetworking is the
+	     narrowest exception that covers it; it does not permit anything
+	     off the local network. -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+
+	<!-- iOS 14 introduced the local-network prompt. Whether watchOS asks
+	     at all is unverified; the key costs nothing and the sentence is
+	     there if it does. -->
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Sends your heart rate to the PC running the overlay.</string>
+</dict>
+</plist>

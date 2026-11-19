@@ -742,19 +742,66 @@ const ANATOMY = (() => {
     };
   }
 
-  /* ---- the ECG trace: beats of `w` px, peak `amp` px ---------------- */
-  function ecg(beats, w, amp, y0) {
+  /* ---- the ECG trace ------------------------------------------------
+     A real lead-II complex: P, the PR segment, QRS, the ST segment, T,
+     then diastole until the next beat.
+
+     The intervals are in SECONDS, not in fractions of the beat, because
+     that is what a heart does. A QRS is ~90 ms at 50 bpm and ~90 ms at
+     160; what a faster heart shortens is the rest between beats, and the
+     QT, which follows Bazett (QT = QTc x sqrt(RR)). Drawn as fractions of
+     the beat -- which is what this did until 2026-11-07 -- the whole
+     complex stretches and squashes with the rate, and no heart has ever
+     done that.
+
+     `rr` is one beat's width in px and `speed` the paper speed in px/s,
+     so seconds and px are the same measurement twice. `amp` is the height
+     of R; everything else is a fraction of it, in lead-II proportions.
+     -------------------------------------------------------------------- */
+  const QTC = 0.4,          // s: Bazett's constant, a healthy adult
+    P_D = 0.09,             // s: the P wave
+    PR_D = 0.07,            // s: the flat PR segment after it
+    QRS_D = 0.09;           // s: Q, R and S together
+
+  function ecg(beats, rr, amp, y0, speed) {
+    const RR = rr / speed;
+    /* QT cannot outrun the beat it sits in: at a sprint the complex takes
+       nearly the whole cycle and diastole is what is left. */
+    const QT = Math.min(QTC * Math.sqrt(RR), RR * 0.78),
+      tail = Math.max(0.06, QT - QRS_D),
+      ST_D = tail * 0.35,
+      T_D = tail * 0.65,
+      span = P_D + PR_D + QRS_D + ST_D + T_D,
+      /* Above ~190 bpm even that does not fit; squeeze the lot rather
+         than let one beat draw over the next. */
+      k = span > RR * 0.94 ? (RR * 0.94) / span : 1;
     const pts = [];
     for (let b = 0; b < beats; b++) {
-      const x0 = b * w,
-        X = (k) => x0 + k * w;
-      pts.push([X(0), y0], [X(0.14), y0]);
-      for (let s = 1; s < 8; s++) pts.push([X(0.14 + s * 0.012), y0 - Math.sin((s / 8) * Math.PI) * amp * 0.12]);
-      pts.push([X(0.24), y0], [X(0.3), y0], [X(0.315), y0 + amp * 0.1], [X(0.345), y0 - amp], [X(0.375), y0 + amp * 0.26], [X(0.395), y0], [X(0.5), y0]);
-      for (let s = 1; s < 12; s++) pts.push([X(0.5 + s * 0.013), y0 - Math.sin((s / 12) * Math.PI) * amp * 0.24]);
-      pts.push([X(0.66), y0]);
+      const x0 = b * rr,
+        put = (t, y) => pts.push([x0 + t * k * speed, y0 - y * amp]);
+      put(0, 0);
+      /* P: low and round, the atria filling. */
+      for (let i = 1; i < 7; i++) put((P_D * i) / 6, 0.15 * Math.sin((i / 6) * Math.PI));
+      put(P_D, 0);
+      put(P_D + PR_D, 0);
+      /* QRS: three straight limbs, because it is a spike and not a curve. */
+      const q = P_D + PR_D;
+      put(q + QRS_D * 0.22, -0.1);
+      put(q + QRS_D * 0.45, 1);
+      put(q + QRS_D * 0.72, -0.25);
+      put(q + QRS_D, 0);
+      const st = q + QRS_D;
+      put(st + ST_D, 0);
+      /* T: asymmetric -- a slow climb and a quicker fall, so the peak
+         sits about 60% of the way through. */
+      for (let i = 1; i < 11; i++) {
+        const u = i / 10;
+        put(st + ST_D + T_D * u, 0.28 * Math.sin(Math.pow(u, 1.35) * Math.PI));
+      }
+      /* Diastole: flat to the next beat. This is the part the rate
+         actually moves. */
+      pts.push([x0 + rr, y0]);
     }
-    pts.push([beats * w, y0]);
     return poly(pts);
   }
 

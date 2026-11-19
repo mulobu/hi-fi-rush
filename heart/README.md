@@ -6,7 +6,7 @@ only Fitness Friday shows it.
 
 ```
 Apple Watch app  --HTTP POST /hr-->  heart-bridge.py :4462  --SSE /events-->  overlay pages
-(not written yet)                    (this folder)                           (HEART in sheet.js)
+(../watch/)                          (this folder)                           (HEART in sheet.js)
 ```
 
 | | |
@@ -16,6 +16,10 @@ Apple Watch app  --HTTP POST /hr-->  heart-bridge.py :4462  --SSE /events-->  ov
 | `--host 127.0.0.1` | Local only: no firewall prompt, but the watch cannot reach it |
 
 ## For the watch app
+
+The app is `watch/` ([ADR 0030](../docs/adr/0030-the-watch-app-is-standalone-and-drops-rather-than-queues.md)),
+and it posts to the contract below. The notes after it are what shaped it,
+kept here because this is the side that has to keep the promise.
 
 The contract the app posts to:
 
@@ -42,7 +46,9 @@ What shapes the app (ADR 0028 has the sources):
   exception** (`NSAllowsLocalNetworking`).
 - **If the watch cannot reach the PC on its own**, relay through an iPhone
   app (WatchConnectivity) to the same `POST /hr`.
-- **Where it goes:** `watch/` in this repo, unless there is a reason not to.
+- **Where it went:** `watch/`, a standalone watchOS app with no iPhone
+  target. `watch/README.md` has what the simulator measured, and what
+  still needs the real watch.
 
 To test from any machine on the network without the watch:
 

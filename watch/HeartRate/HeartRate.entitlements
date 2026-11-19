@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>com.apple.developer.healthkit</key>
+	<true/>
+	<!-- No com.apple.developer.healthkit.access. That key is clinical
+	     health records (Verifiable Health Records), and Apple has to
+	     approve it for the team and bundle id before it can go in a
+	     profile -- an empty array is still a request for it, and a device
+	     build fails on it. Reading heart rate needs only the key above. -->
+</dict>
+</plist>

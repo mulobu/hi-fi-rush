@@ -58,3 +58,11 @@ chat/blocklist.txt
 # so the raw file carries the websocket password and your home path.
 basic/scenes/
 *.json.bak
+
+# Xcode's own noise around watch/. The project file IS committed -- it is how
+# the app builds; what is not is the per-user window state and the build
+# products, which are derived from it.
+watch/**/xcuserdata/
+watch/**/*.xcworkspace/xcuserdata/
+watch/build/
+watch/DerivedData/

@@ -1,12 +1,13 @@
 # 0028 — Heart rate comes from our own Apple Watch app, over HTTP to a bridge
 
 - **Date:** 2026-11-04
-- **Status:** Accepted. The PC side is built: `heart/heart-bridge.py` and the
-  live readout in Fitness Friday's pages. On 2026-11-05 it was tested with
-  the bridge's `--fake` feed, in the browser and in OBS on both canvases.
-  The tests covered validation, going live, going lost, and reconnecting.
-  **The watch app is not built.** It will be made on the user's MacBook, in
-  a later session, against the contract below.
+- **Status:** Accepted, both sides built. The PC side is
+  `heart/heart-bridge.py` and the live readout in Fitness Friday's pages,
+  tested on 2026-11-05 with the bridge's `--fake` feed, in the browser and
+  in OBS on both canvases: validation, going live, going lost, reconnecting.
+  **The watch app was built on 2026-11-07** and lives in `watch/`; what it
+  settled of what is left open below, and the one consequence here it
+  replaces, are in [0030](0030-the-watch-app-is-standalone-and-drops-rather-than-queues.md).
 
 ## Context
 
@@ -84,6 +85,9 @@ chat timestamps already showed (root `CLAUDE.md` §2).
 
 **The ECG keeps its drawn speed.** A real trace scrolls at a constant paper
 speed, and changing the CSS animation's duration mid-run makes it jump.
+*(Revised by [0032](0032-the-ecg-follows-the-rate-at-a-constant-paper-speed.md):
+the speed is still constant and the animation still untouched, but the beats
+inside it are now spaced by the live rate.)*
 
 **`start.py` starts the bridge** when the overlay's `overlay.json` has
 `"heart": true`. Fitness Friday does; the other overlays don't.

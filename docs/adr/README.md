@@ -32,8 +32,12 @@ is — and why it changed.
 | [0025](0025-setup-owns-the-transition-filters.md) | Setup owns an overlay's transition filters | 2026-11-04 | Built; tested against the live collection, `--recompile` included |
 | [0026](0026-setup-copies-a-mic-into-a-new-collection.md) | Setup copies a mic into a collection that has none | 2026-11-04 | Built; tested on `Overlay Template`, then restored |
 | [0027](0027-fitness-friday-blueprint-sheet-and-word-sting.md) | Fitness Friday: a blueprint sheet, and the word sting replaces the pan | 2026-11-04 | Built; both pages in OBS 2026-11-05, punch sets read back |
-| [0028](0028-heart-rate-from-our-own-watch-app.md) | Heart rate comes from our own Apple Watch app, over HTTP to a bridge | 2026-11-04 | Accepted; PC side built and tested with `--fake`, in OBS; the watch app is not built |
+| [0028](0028-heart-rate-from-our-own-watch-app.md) | Heart rate comes from our own Apple Watch app, over HTTP to a bridge | 2026-11-04 | Accepted; both sides built — the watch app is 0030 |
 | [0029](0029-setup-copies-the-hardware-sources.md) | Setup copies Game, Cam, Browser and Chat's url into a collection that has them unset | 2026-11-05 | Built; tested on `Fitness Friday` by blanking and restoring |
+| [0030](0030-the-watch-app-is-standalone-and-drops-rather-than-queues.md) | The watch app is standalone, discards its workout, and drops a reading rather than queueing it | 2026-11-07 | Built; whole chain driven on the watchOS simulator; never run on the real watch |
+| [0031](0031-setup-runs-on-macos.md) | Setup runs on macOS: `Discord` only where OBS registers its kind, and a new collection's file is waited for | 2026-11-07 | Built; both faults found building the four overlays on the Mac |
+| [0032](0032-setup-names-the-plugins-it-cannot-install.md) | Setup names every plugin the overlay can use that OBS has not loaded, and installs none | 2026-11-07 | Built; reported against the live Tech Talks Tuesday collection |
+| [0032](0032-the-ecg-follows-the-rate-at-a-constant-paper-speed.md) | The ECG follows the heart rate, by spacing the beats, not by scrolling faster | 2026-11-07 | Built; driven on both pages at 58 and 150 bpm; revises 0028 |
 
 Decisions taken before 2026-11-01 are in the table in `CLAUDE.md` §3, with
 their reasoning in §2. They are not back-filled here.

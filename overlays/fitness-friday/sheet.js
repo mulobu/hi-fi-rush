@@ -61,7 +61,8 @@ function transformFor(t) {
    BUILDERS -- what a page's SCENES html() is made of. Boxes are canvas px.
    ================================================================ */
 const SHEET_NO = { start: "01", chat: "02", game: "03", cam: "04", brb: "05", end: "06" };
-const px = (v) => `${Math.round(v * 10) / 10}px`;
+const r1 = (v) => Math.round(v * 10) / 10;
+const px = (v) => `${r1(v)}px`;
 const at = (x, y, w, h) =>
   `left:${px(x)};top:${px(y)}` + (w != null ? `;width:${px(w)}` : "") + (h != null ? `;height:${px(h)}` : "");
 
@@ -112,17 +113,57 @@ function win(r, label, { tab = "tl", corners = ["tl", "tr", "bl", "br"] } = {}) 
   const [x, y, w, h] = r;
   return `<div class="win tab-${tab}" style="${at(x, y, w, h)}">${corners.map((c) => `<i class="c ${c}"></i>`).join("")}${label ? `<span class="win-tab">${label}</span>` : ""}</div>`;
 }
-/* A running ECG strip, w x h. The trace is two copies long and slides one
-   copy's worth per loop, at 72 bpm. */
+/* A running ECG strip, w x h. The trace is two loops long and slides one
+   loop's worth per turn, so it repeats seamlessly.
+
+   `beat` is the width of one beat at 72 bpm, which fixes the PAPER SPEED
+   at beat x 1.2 px/s. That speed never changes -- a real trace runs at a
+   constant 25 mm/s whatever the heart does -- so the scroll animation is
+   written once and never touched again. What the live rate changes is how
+   many beats are drawn inside the loop (ECG.tune), and nothing else: the
+   path's `d` is rewritten while the transform carries on untouched, so a
+   rate change cannot make the trace jump sideways. That was the whole
+   reason ADR 0028 left this pinned at 72.
+
+   The loop is six times the strip, which is the trade: the beats-per-loop
+   count has to be whole or the seam would cut a beat in half, so the rate
+   the trace actually draws is quantised. Measured over both strips, six
+   loops keeps it within 3.2% between 60 and 180 bpm, and 4.8% over 40 to
+   200 -- a bpm or two, next to a number that is exact. Longer loops are
+   finer and cost path: at 185 bpm this one is already ~2700 points. */
 function ecgStrip(x, y, w, h, { beat = 180, cls = "" } = {}) {
-  const k = Math.ceil(w / beat),
-    dur = ((k * 60) / 72).toFixed(3);
+  const speed = beat * 1.2,
+    loop = Math.ceil(w / beat) * beat * 6,
+    dur = (loop / speed).toFixed(3);
   return (
-    `<div class="ecg ${cls}" style="${at(x, y, w, h)}"><div class="ecg-run" style="width:${2 * k * beat}px;animation-duration:${dur}s;--shift:${-k * beat}px">` +
-    `<svg viewBox="0 0 ${2 * k * beat} ${h}" width="${2 * k * beat}" height="${h}"><path d="${ANATOMY.ecg(2 * k, beat, h * 0.7, h * 0.78)}"/></svg>` +
+    `<div class="ecg ${cls}" style="${at(x, y, w, h)}">` +
+    `<div class="ecg-run" data-speed="${speed}" data-loop="${loop}" data-amp="${r1(h * 0.7)}" data-y0="${r1(h * 0.78)}"` +
+    ` style="width:${2 * loop}px;animation-duration:${dur}s;--shift:${-loop}px">` +
+    `<svg viewBox="0 0 ${2 * loop} ${h}" width="${2 * loop}" height="${h}"><path d=""/></svg>` +
     `</div></div>`
   );
 }
+
+/* Redraws every strip for a heart rate. Called by HEART on each reading,
+   and once at boot with the design's 72. */
+const ECG = (() => {
+  function tune(bpm) {
+    document.querySelectorAll(".ecg-run").forEach((run) => {
+      const speed = +run.dataset.speed,
+        loop = +run.dataset.loop,
+        /* A whole number of beats per loop, or the seam would cut one in
+           half. That rounding is the quantisation above. */
+        n = Math.max(1, Math.round(loop / ((speed * 60) / bpm)));
+      if (run.dataset.n === String(n)) return; // same spacing: leave it alone
+      run.dataset.n = n;
+      run.querySelector("path").setAttribute(
+        "d",
+        ANATOMY.ecg(2 * n, loop / n, +run.dataset.amp, +run.dataset.y0, speed)
+      );
+    });
+  }
+  return { tune };
+})();
 /* The BPM readout. Its number is HEART's: the drawn 72 until the watch
    sends one (docs/adr/0028). */
 function bpmReadout(x, y, size) {
@@ -414,6 +455,7 @@ const HEART = (() => {
     document.querySelectorAll(".bpm-val").forEach((e) => (e.textContent = text));
     const rate = state === "live" ? bpm : DESIGN;
     document.documentElement.style.setProperty("--beat", `${Math.round(60000 / rate)}ms`);
+    ECG.tune(rate);
   }
   function start(port) {
     show("design");
